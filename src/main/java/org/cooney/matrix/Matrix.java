@@ -1,102 +1,182 @@
 package org.cooney.matrix;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Matrix {
     private final double[][] data;
     private final int rows;
     private final int columns;
 
-    public Matrix(int rows, int columns) {
+    protected Matrix(int rows, int columns) {
         this.rows = rows;
         this.columns = columns;
         this.data = new double[rows][columns];
+    }
 
-        randomlyInitialiseData(rows, columns, -1, 1);
+    public Matrix(int rows, int columns, boolean autoSeed) {
+        this(rows, columns);
+
+        if (autoSeed) {
+            randomlyInitialiseData(rows, columns, -1, 1);
+        }
     }
 
     public Matrix(int rows, int columns, int seedValueMinimum, int seedValueMaximum) {
-        this.rows = rows;
-        this.columns = columns;
-        this.data = new double[rows][columns];
-
+        this(rows, columns);
         randomlyInitialiseData(rows, columns, seedValueMinimum, seedValueMaximum);
     }
 
-    public void add(double scalar) {
-        for(int x = 0; x < this.rows; x++) {
-            for(int y = 0; y < this.columns; y++) {
-                this.data[x][y] += scalar;
-            }
+    public Matrix(double[] seedArray) {
+        this(seedArray.length, 1);
+
+        for(int x = 0; x < seedArray.length; x++) {
+            this.data[x][0] = seedArray[x];
         }
     }
 
-    public void add(Matrix m) throws InvalidMatrixShapeException {
+    public Matrix add(double scalar) {
+        Matrix outputMatrix = new Matrix(this.rows, this.columns);
+
+        for(int x = 0; x < this.rows; x++) {
+            for(int y = 0; y < this.columns; y++) {
+                outputMatrix.getData()[x][y] = this.data[x][y] + scalar;
+            }
+        }
+
+        return outputMatrix;
+    }
+
+    public Matrix add(Matrix m) throws InvalidMatrixShapeException {
         if (m.getRows() != this.rows || m.getColumns() != this.columns){
             throw new InvalidMatrixShapeException("Invalid Shape for Matrix Add");
         }
 
+        Matrix outputMatrix = new Matrix(this.rows, this.columns);
+
         for(int x = 0; x < rows; x++) {
             for(int y = 0; y < columns; y++) {
-                this.data[x][y] += m.getData()[x][y];
+                outputMatrix.getData()[x][y] = this.data[x][y] + m.getData()[x][y];
             }
         }
+
+        return outputMatrix;
     }
 
-    public void multiply(double factor) {
+    public Matrix multiply(double factor) {
+        Matrix outputMatrix = new Matrix(this.rows, this.columns);
+
         for(int x = 0; x < this.rows; x++) {
             for(int y = 0; y < this.columns; y++) {
-                this.data[x][y] *= factor;
+                outputMatrix.getData()[x][y] = this.data[x][y] * factor;
             }
         }
+
+        return outputMatrix;
     }
 
-    public void multiply(Matrix m) throws InvalidMatrixShapeException {
+    public Matrix multiply(Matrix m) throws InvalidMatrixShapeException {
         if (m.getRows() != this.rows || m.getColumns() != this.columns){
             throw new InvalidMatrixShapeException("Invalid Shape for Matrix Add");
         }
 
+        Matrix outputMatrix = new Matrix(this.rows, this.columns);
+
         for(int x = 0; x < rows; x++) {
             for(int y = 0; y < columns; y++) {
-                this.data[x][y] *= m.getData()[x][y];
+                outputMatrix.getData()[x][y] = this.data[x][y] * m.getData()[x][y];
             }
         }
+
+        return outputMatrix;
     }
 
-    public void subtract(double scalar) {
+    public Matrix subtract(double scalar) {
+        Matrix outputMatrix = new Matrix(this.rows, this.columns);
+
         for(int x = 0; x < this.rows; x++) {
             for(int y = 0; y < this.columns; y++) {
-                this.data[x][y] -= scalar;
+                outputMatrix.getData()[x][y] = this.data[x][y] - scalar;
             }
         }
+
+        return outputMatrix;
     }
 
-    public void subtract(Matrix m) throws InvalidMatrixShapeException {
+    public Matrix subtract(Matrix m) throws InvalidMatrixShapeException {
         if (m.getRows() != this.rows || m.getColumns() != this.columns){
             throw new InvalidMatrixShapeException("Invalid Shape for Matrix Add");
         }
 
+        Matrix outputMatrix = new Matrix(this.rows, this.columns);
+
         for(int x = 0; x < rows; x++) {
             for(int y = 0; y < columns; y++) {
-                this.data[x][y] -= m.getData()[x][y];
+                outputMatrix.getData()[x][y] = this.data[x][y] - m.getData()[x][y];
             }
         }
+
+        return outputMatrix;
     }
 
-    public void sigmoid() {
+    public Matrix sigmoid() {
+        Matrix outputMatrix = new Matrix(this.rows, this.columns);
+
         for(int x = 0; x < this.rows; x++) {
             for(int y = 0; y < this.columns; y++) {
-                this.data[x][y] = 1/(1 +Math.exp(-this.data[x][y]));
+                outputMatrix.getData()[x][y] = 1/(1 +Math.exp(-this.data[x][y]));
             }
         }
+
+        return outputMatrix;
     }
 
-    public void performDerivativeSigmoid(Matrix m) {
-        Matrix output = new Matrix(m.getRows(), m.getColumns());
+    public Matrix derivativeSigmoid() {
+        Matrix outputMatrix = new Matrix(this.rows, this.columns);
+
+        for(int x = 0; x < outputMatrix.getRows(); x++) {
+            for(int y = 0; y < outputMatrix.getColumns(); y++) {
+                outputMatrix.getData()[x][y] = this.data[x][y] * (1 - this.data[x][y]);
+            }
+        }
+
+        return outputMatrix;
+    }
+
+    public Matrix transpose() {
+        Matrix output = new Matrix(this.rows, this.columns, true);
 
         for(int x = 0; x < output.getRows(); x++) {
             for(int y = 0; y < output.getColumns(); y++) {
-                output.getData()[x][y] = output.getData
+                output.getData()[x][y] = this.data[y][x];
             }
         }
+
+        return output;
+    }
+
+    public Matrix dotProduct(Matrix m2) throws InvalidMatrixShapeException {
+        if (!isMatricesDefined(this, m2)) {
+            throw new InvalidMatrixShapeException(String.format("Columns of m1 must equal rows of m2 for dot product. m1.columns = %d & m2.rows = %d", this.columns, m2.getRows()));
+        }
+
+        Matrix outputMatrix = new Matrix(this.rows, m2.getColumns(), true);
+
+        for(int x = 0; x < outputMatrix.getRows(); x++) {
+            for(int y = 0; y < outputMatrix.getColumns(); y++) {
+                double total = 0;
+                for(int k = 0; k < this.columns; k++) {
+                    total += this.data[x][k] * m2.getData()[k][y];
+                }
+                outputMatrix.getData()[x][y] = total;
+            }
+        }
+
+        return outputMatrix;
+    }
+
+    private static boolean isMatricesDefined(Matrix m1, Matrix m2) {
+        return m1.getColumns() == m2.getRows();
     }
 
     private void randomlyInitialiseData(int rows, int cols, int seedMin, int seedMax) {
@@ -119,10 +199,16 @@ public class Matrix {
         return columns;
     }
 
-    public Matrix clone() throws CloneNotSupportedException {
-        Matrix m = (Matrix) super.clone();
-        double[][] clonedData = this.data.clone();
+    public double[] toFlatArray() {
+        double[] outputArray = new double[rows * columns];
 
+        int pointer = 0;
+        for(int x = 0; x < this.rows; x++) {
+            for(int y = 0; y < this.columns; y++) {
+                outputArray[pointer++] = this.data[x][y];
+            }
+        }
 
+        return outputArray;
     }
 }
