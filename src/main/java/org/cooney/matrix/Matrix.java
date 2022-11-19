@@ -77,7 +77,7 @@ public class Matrix {
 
     public Matrix multiply(Matrix m) throws InvalidMatrixShapeException {
         if (m.getRows() != this.rows || m.getColumns() != this.columns){
-            throw new InvalidMatrixShapeException("Invalid Shape for Matrix Add");
+            throw new InvalidMatrixShapeException(String.format("Invalid Shape for Matrix Multiply - This = [%d, %d], m = [%d, %d]", this.rows, this.columns, m.getRows(), m.getColumns()));
         }
 
         Matrix outputMatrix = new Matrix(this.rows, this.columns);
@@ -144,11 +144,11 @@ public class Matrix {
     }
 
     public Matrix transpose() {
-        Matrix output = new Matrix(this.rows, this.columns, true);
+        Matrix output = new Matrix(this.columns, this.rows);
 
-        for(int x = 0; x < output.getRows(); x++) {
-            for(int y = 0; y < output.getColumns(); y++) {
-                output.getData()[x][y] = this.data[y][x];
+        for(int x = 0; x < this.getRows(); x++) {
+            for(int y = 0; y < this.getColumns(); y++) {
+                output.getData()[y][x] = this.data[x][y];
             }
         }
 

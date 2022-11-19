@@ -174,14 +174,17 @@ public class MatrixTest {
 
     @Test
     public void testMatrixTransposition() {
-        Matrix m = new Matrix(4, 4, true);
+        Matrix m = new Matrix(8, 4, true);
         Matrix output = m.transpose();
 
-        for(int x = 0; x < 4; x++) {
-            for(int y = 0; y < 4; y++) {
-                Assert.assertEquals(m.getData()[x][y], output.getData()[y][x], 0);
+        for(int x = 0; x < output.getRows(); x++) {
+            for(int y = 0; y < output.getColumns(); y++) {
+                Assert.assertEquals(m.getData()[y][x], output.getData()[x][y], 0);
             }
         }
+
+        Assert.assertEquals(m.getColumns(), output.getRows(), 0);
+        Assert.assertEquals(m.getRows(), output.getColumns(), 0);
     }
 
     @Test
