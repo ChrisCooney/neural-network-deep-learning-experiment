@@ -1,6 +1,7 @@
 package org.cooney.neural;
 
 import org.cooney.matrix.InvalidMatrixShapeException;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -22,8 +23,13 @@ public class NeuralNetworkIntegrationTest {
 
         xorNetwork.fit(neuralNetworkTrainingData, 50000);
 
-        for(double[] validInput: validInputs) {
-            System.out.println(Arrays.toString(xorNetwork.predict(validInput)));
+        for(int x = 0; x < validInputs.length; x++) {
+            double[] validInput = validInputs[x];
+            double expectedOutput = validOutputs[x][0];
+            double actualOutput = xorNetwork.predict(validInput)[0];
+
+            Assert.assertEquals(expectedOutput, actualOutput, 0.3);
+            System.out.printf("Input = %s - Expected = %f, Actual = %f%n", Arrays.toString(validInput), expectedOutput, actualOutput);
         }
     }
 }
