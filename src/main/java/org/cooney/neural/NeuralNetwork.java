@@ -60,6 +60,10 @@ public class NeuralNetwork {
 
     /**
      * Updates the weights in the network based on the error between the output and the target.
+     *
+     * THIS NEEDS TO CHANGE - Right now it's doing a model based training. I did X, I should have done Y.
+     * Instead, we need to say you did X and your KPIs moved in a bad direction. Need to find an algorithm for this.
+     *
      * @param input The input from the last feedforward run.
      * @param target The Correct output (or some function indicating how optimal the prediction was)
      * @throws InvalidMatrixShapeException The input or target is not in the right format for dot product.

@@ -1,7 +1,10 @@
 package org.cooney;
 
+import org.cooney.world.WorldView;
+
 public class Main {
     public static void main(String[] args) {
-        System.out.println("Hello world!");
+        WorldView worldView = new WorldView();
+        worldView.run();
     }
 }

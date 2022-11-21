@@ -34,4 +34,3 @@ public class NeuralNetworkTrainingData {
     }
 }
 
-class InvalidTrainingDataException extends Exception { }
