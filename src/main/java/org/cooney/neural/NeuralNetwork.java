@@ -3,6 +3,8 @@ package org.cooney.neural;
 import org.cooney.matrix.InvalidMatrixShapeException;
 import org.cooney.matrix.Matrix;
 
+import java.util.Arrays;
+
 public class NeuralNetwork {
 
     private Matrix inputHiddenLayerWeights;
@@ -10,7 +12,7 @@ public class NeuralNetwork {
     private Matrix hiddenLayerBias;
     private Matrix outputLayerBias;
 
-    private double learningRate;
+    private final double learningRate;
 
     /**
      * Auto-generate constructor that will build the Matrices in the correct way, using desired input values.
@@ -58,14 +60,25 @@ public class NeuralNetwork {
                 .sigmoid();
     }
 
+
+    private void qLearning(double[] oldState, double score, double[] newState, int action) throws InvalidMatrixShapeException {
+        // Then we estimate the Q Value for the next action we're going to take
+        double[] estimatedQValuesFromOldState = predict(oldState);
+        double[] expectedQValueForNextAction = predict(newState);
+
+        double discount = 0.95;
+
+        estimatedQValuesFromOldState[action] = score + (discount * Arrays.stream(expectedQValueForNextAction).max().getAsDouble());
+
+        train(oldState, estimatedQValuesFromOldState);
+    }
+
     /**
      * Updates the weights in the network based on the error between the output and the target.
      *
-     * THIS NEEDS TO CHANGE - Right now it's doing a model based training. I did X, I should have done Y.
-     * Instead, we need to say you did X and your KPIs moved in a bad direction. Need to find an algorithm for this.
-     *
      * @param input The input from the last feedforward run.
-     * @param target The Correct output (or some function indicating how optimal the prediction was)
+     * @param target The target to on which to train the network.
+     *
      * @throws InvalidMatrixShapeException The input or target is not in the right format for dot product.
      */
     public void train(double[] input, double[] target) throws InvalidMatrixShapeException {
@@ -111,7 +124,13 @@ public class NeuralNetwork {
     public void fit(NeuralNetworkTrainingData trainingData, int epochs) throws InvalidMatrixShapeException {
         for(int iterationCount = 0; iterationCount < epochs; iterationCount++) {
             int randomIndex = (int)(Math.random() * trainingData.getDataSize());
-            this.train(trainingData.getInputAtIndex(randomIndex), trainingData.getOutputAtIndex(randomIndex));
+
+            double[] input = trainingData.getInputAtIndex(randomIndex);
+            double[] newState = trainingData.getNewStateAtIndex(randomIndex);
+            double score = trainingData.getScoreAtIndex(randomIndex);
+            int action = trainingData.getActionAtIndex(randomIndex);
+
+            this.qLearning(input, score, newState, action);
         }
     }
 
@@ -121,13 +140,5 @@ public class NeuralNetwork {
 
     public Matrix getHiddenOutputLayerWeights() {
         return hiddenOutputLayerWeights;
-    }
-
-    public Matrix getHiddenLayerBias() {
-        return hiddenLayerBias;
-    }
-
-    public Matrix getOutputLayerBias() {
-        return outputLayerBias;
     }
 }

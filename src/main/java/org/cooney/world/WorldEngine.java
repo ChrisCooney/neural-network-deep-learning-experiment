@@ -42,7 +42,7 @@ public class WorldEngine {
         }
     }
     private WorldItem decideWorldItemByChance() {
-        boolean isLivingThing = ChanceUtils.rollTheDice(0.1);
+        boolean isLivingThing = ChanceUtils.rollTheDice(0.09);
 
         if (isLivingThing) {
             LivingThing lt = new LivingThing(this);
@@ -50,11 +50,11 @@ public class WorldEngine {
             return lt;
         }
 
-        boolean isFood = ChanceUtils.rollTheDice(1);
+        boolean isFood = ChanceUtils.rollTheDice(0.5);
 
         if (isFood) return new Food();
 
-        boolean isWater = ChanceUtils.rollTheDice(2);
+        boolean isWater = ChanceUtils.rollTheDice(0.5);
 
         if (isWater) return new Water();
 

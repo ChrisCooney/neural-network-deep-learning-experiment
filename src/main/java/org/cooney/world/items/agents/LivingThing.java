@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 public class LivingThing implements Actor, WorldItem, Learner {
 
     private static final int MEDITATION_CADENCE_IN_TICKS = 100;
+    private static final int MAX_MEMORY_SIZE = 10000;
 
     private final NeuralNetwork neuralNetwork;
     private final List<LivingThingMemory> memory;
@@ -36,7 +37,7 @@ public class LivingThing implements Actor, WorldItem, Learner {
     private int ticksSinceLastMeditation;
 
     public LivingThing(WorldEngine outsideWorld) {
-        neuralNetwork = new NeuralNetwork(8, 30, 3, 1);
+        neuralNetwork = new NeuralNetwork(8, 30, 9, 0.01);
         this.memory = new ArrayList<>();
 
         this.hunger = 0;
@@ -49,17 +50,13 @@ public class LivingThing implements Actor, WorldItem, Learner {
 
     @Override
     public void act(List<GridItem> gridItems) {
-        double[] input = gridItems.stream()
-                .map(GridItem::getWorldItem)
-                .map(WorldItem::getWorldItemId)
-                .mapToDouble(Double::doubleValue)
-                .toArray();
+        double[] input = gridItemsToNetworkInput(gridItems);
 
         try {
             if (ticksSinceLastMeditation < MEDITATION_CADENCE_IN_TICKS) {
-                makeAMove(input, gridItems);
+                makeAMove(input);
             } else {
-                meditateOnWhatYouHaveLearned();
+                learn();
                 ticksSinceLastMeditation = 0;
             }
 
@@ -68,19 +65,32 @@ public class LivingThing implements Actor, WorldItem, Learner {
         }
     }
 
-    private void makeAMove(double[] input, List<GridItem> gridItems) throws InvalidMatrixShapeException {
-        double[] decisionData = decide(gridItems, input);
-        move(decisionData[0], decisionData[1], decisionData[2]);
+    private double[] gridItemsToNetworkInput(List<GridItem> gridItems) {
+        return gridItems.stream()
+                .map(GridItem::getWorldItem)
+                .map(WorldItem::getWorldItemId)
+                .mapToDouble(Double::doubleValue)
+                .toArray();
+    }
+
+    private void makeAMove(double[] input) throws InvalidMatrixShapeException {
+        Direction direction = decide(input);
+        move(direction);
         List<GridItem> surroundingGridItems = lookAround();
         double[] newStats = consumeResources(surroundingGridItems);
-        boolean wasAGoodMove = decideIfIMadeAGoodMove(newStats);
+        double moveScore = scoreTheMoveIMade(newStats);
         updateMyStats(newStats);
-        rememberThisDecision(input, decisionData, wasAGoodMove);
+        rememberThisDecision(input, moveScore, gridItemsToNetworkInput(surroundingGridItems), direction);
         this.ticksSinceLastMeditation ++;
     }
 
-    private void rememberThisDecision(double[] input, double[] output, boolean wasAGoodMove) {
-        this.memory.add(new LivingThingMemory(input, output, wasAGoodMove));
+    private void rememberThisDecision(double[] input, double moveScore, double[] newSurroundingItems, Direction direction) {
+        this.memory.add(new LivingThingMemory(input, moveScore, newSurroundingItems, direction));
+
+        if (this.memory.size() > MAX_MEMORY_SIZE) {
+            // Get rid of the oldest memory from the working set.
+            this.memory.remove(0);
+        }
     }
 
     private void updateMyStats(double[] newStats) {
@@ -89,21 +99,34 @@ public class LivingThing implements Actor, WorldItem, Learner {
         this.isolation = newStats[2];
     }
 
-    private boolean decideIfIMadeAGoodMove(double[] newStats) {
-        boolean wasAGoodMove = false;
+    private double scoreTheMoveIMade(double[] newStats) {
+        double score = 0;
 
-        if (newStats[0] < this.hunger) {
-            // We've lowered hunger!
-            wasAGoodMove = true;
-        } else if (newStats[1] < this.thirst) {
-            // We've lowered thirst!
-            wasAGoodMove = true;
-        } else if (newStats[2] < this.isolation) {
-            // We've lowered isolation!
-            wasAGoodMove = true;
+        if (hunger > thirst && hunger > isolation) {
+            // Hunger is the primary motivator. Score based on that.
+            if (newStats[0] < hunger) {
+                // We reduced hunger and that was the goal! Yay!
+                score += 10;
+            }
         }
 
-        return wasAGoodMove;
+        if (thirst > hunger && thirst > isolation) {
+            // Thirst is the most important...
+            if (newStats[1] < thirst) {
+                score += 10;
+            }
+        }
+
+        if (isolation > hunger && isolation > thirst) {
+            // Isolation is the most important...
+            if (newStats[2] < isolation) {
+                score += 10;
+            }
+        }
+
+        System.out.println("SCORE: " + score);
+
+        return score;
     }
 
     private double[] consumeResources(List<GridItem> gridItems) {
@@ -121,7 +144,7 @@ public class LivingThing implements Actor, WorldItem, Learner {
                     .max((f1, f2) -> (int) (f1.getResourceCount() - f2.getResourceCount()))
                     .ifPresent((bestFoodSource) -> {
                         bestFoodSource.consume(this);
-                        newStats[0] = this.hunger - 1;
+                        newStats[0] = 0;
                     });
         }
 
@@ -135,7 +158,7 @@ public class LivingThing implements Actor, WorldItem, Learner {
                     .max((w1, w2) -> (int) (w1.getResourceCount() - w2.getResourceCount()))
                     .ifPresent((bestWaterSource) -> {
                         bestWaterSource.consume(this);
-                        newStats[1] = this.thirst > 0 ? this.thirst - 1 : 0;
+                        newStats[1] = 0;
                     });
         }
 
@@ -153,43 +176,55 @@ public class LivingThing implements Actor, WorldItem, Learner {
         return outsideWorld.getGridItemsAroundActor(this);
     }
 
-    private void move(double speed, double xDelta, double yDelta) {
-        if (speed <= 0) {
-            return;
-        }
-
-        int xDirection = xDelta > 0 ? 1 : -1;
-        int yDirection = yDelta > 0 ? 1 : -1;
+    private void move(Direction direction) {
+        int xDirection = direction.getXDirection();
+        int yDirection = direction.getYDirection();
 
         outsideWorld.moveActor(this, xDirection, yDirection);
     }
 
-    private double[] decide(List<GridItem> gridItems, double[] networkInput) throws InvalidMatrixShapeException {
-        return neuralNetwork.predict(networkInput);
-    }
+    private Direction decide(double[] networkInput) throws InvalidMatrixShapeException {
+        double[] possibleQValues = neuralNetwork.predict(networkInput);
 
-    private void meditateOnWhatYouHaveLearned() throws InvalidTrainingDataException, InvalidMatrixShapeException {
-        List<LivingThingMemory> happyMemories = memory.stream().filter(LivingThingMemory::isGoodMemory).toList();
+        int indexOfMax = -1;
+        double temp = -1;
 
-        if (happyMemories.size() == 0) {
-            // This poor soul has no happy memories.
-            return;
+        for(int x = 0; x < possibleQValues.length; x++) {
+            if (possibleQValues[x] > temp) {
+                indexOfMax = x;
+                temp = possibleQValues[x];
+            }
         }
 
-        double[][] happyInputs = new double[happyMemories.size()][8];
-        double[][] happyOutputs = new double[happyMemories.size()][3];
-        for(int x = 0; x < happyMemories.size(); x++) {
-            happyInputs[x] = happyMemories.get(x).input();
-            happyOutputs[x] = happyMemories.get(x).output();
-        }
+        Direction d = Direction.getFromIndex(indexOfMax);
 
-        NeuralNetworkTrainingData neuralNetworkTrainingData = new NeuralNetworkTrainingData(happyInputs, happyOutputs);
-        neuralNetwork.fit(neuralNetworkTrainingData, 100);
+        System.out.printf("I am deciding to go %s - My Stats are Hunger = %f, Thirst = %f, Isolation = %f%n", d.toString(), this.hunger, this.thirst, this.isolation);
+
+        return Direction.getFromIndex(indexOfMax);
     }
 
     @Override
-    public void learn() {
+    public void learn() throws InvalidTrainingDataException, InvalidMatrixShapeException {
+        if (memory.size() == 0) {
+            // This poor soul has no memories. Allow them to continue to wander aimlessly in the dystopian abyss
+            // that I have created. Vaya con dios my friend.
+            return;
+        }
 
+        double[][] inputs = new double[memory.size()][8];
+        double[] scores = new double[memory.size()];
+        double[][] newSurroundingItems = new double[memory.size()][8];
+        int[] actionsTaken = new int[memory.size()];
+
+        for (int x = 0; x < memory.size(); x++) {
+            inputs[x] = memory.get(x).input();
+            scores[x] = memory.get(x).score();
+            newSurroundingItems[x] = memory.get(x).newSurroundingItems();
+            actionsTaken[x] = memory.get(x).action().getIndex();
+        }
+
+        NeuralNetworkTrainingData neuralNetworkTrainingData = new NeuralNetworkTrainingData(inputs, scores, newSurroundingItems, actionsTaken);
+        neuralNetwork.fit(neuralNetworkTrainingData, 100);
     }
 
     @Override
@@ -208,4 +243,4 @@ public class LivingThing implements Actor, WorldItem, Learner {
     }
 }
 
-record LivingThingMemory(double[] input, double[] output, boolean isGoodMemory) {}
+record LivingThingMemory(double[] input, double score, double[] newSurroundingItems, Direction action) {}
