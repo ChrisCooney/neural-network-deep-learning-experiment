@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Matrix {
-    private final double[][] data;
+    private double[][] data;
     private final int rows;
     private final int columns;
 
@@ -32,6 +32,18 @@ public class Matrix {
 
         for(int x = 0; x < seedArray.length; x++) {
             this.data[x][0] = seedArray[x];
+        }
+    }
+
+    public Matrix(int rows, int columns, double[][] data) {
+        this(rows, columns, false);
+
+        this.data = new double[data.length][data[0].length];
+
+        for(int x = 0; x < this.data.length; x++) {
+            for(int y = 0; y < this.data[x].length; y++) {
+                this.data[x][y] = data[x][y];
+            }
         }
     }
 
@@ -210,5 +222,9 @@ public class Matrix {
         }
 
         return outputArray;
+    }
+
+    public Matrix copy() {
+        return new Matrix(this.rows, this.columns, this.data);
     }
 }

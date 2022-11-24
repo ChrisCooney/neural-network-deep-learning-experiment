@@ -29,6 +29,14 @@ public class NeuralNetwork {
         this.learningRate = learningRate;
     }
 
+    public NeuralNetwork(Matrix inputHiddenLayerWeights, Matrix hiddenOutputLayerWeights, Matrix hiddenLayerBias, Matrix outputLayerBias, double learningRate) {
+        this.inputHiddenLayerWeights = inputHiddenLayerWeights;
+        this.hiddenOutputLayerWeights = hiddenOutputLayerWeights;
+        this.hiddenLayerBias = hiddenLayerBias;
+        this.outputLayerBias = outputLayerBias;
+        this.learningRate = learningRate;
+    }
+
     /**
      * This function uses the existing weights in the Neural Network to predict an outcome.
      * @param inputs The desired input parameters
@@ -140,5 +148,9 @@ public class NeuralNetwork {
 
     public Matrix getHiddenOutputLayerWeights() {
         return hiddenOutputLayerWeights;
+    }
+
+    public NeuralNetwork copy() {
+        return new NeuralNetwork(this.inputHiddenLayerWeights.copy(), this.hiddenOutputLayerWeights.copy(), this.hiddenLayerBias.copy(), this.outputLayerBias.copy(), this.learningRate);
     }
 }

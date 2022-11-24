@@ -12,7 +12,7 @@ public class Water implements Consumable, WorldItem {
     private double resourceCount = 300;
     @Override
     public void consume(Actor actor) {
-        this.resourceCount --;
+        //this.resourceCount --;
     }
 
     @Override

@@ -7,4 +7,5 @@ import java.util.List;
 public interface Actor extends WorldItem {
     public void wakeUp();
     public void act(List<GridItem> nearbyGridItems);
+    public boolean isAlive();
 }

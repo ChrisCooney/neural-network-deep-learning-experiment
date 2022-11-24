@@ -1,13 +1,12 @@
 package org.cooney.world;
 
-import org.cooney.world.items.Actor;
-import org.cooney.world.items.EmptyWorldItem;
-import org.cooney.world.items.WorldItem;
-import org.cooney.world.items.WorldItemIds;
+import org.cooney.world.items.*;
+import org.cooney.world.items.agents.Direction;
 import org.cooney.world.items.agents.LivingThing;
 import org.cooney.world.items.resources.Food;
 import org.cooney.world.items.resources.Water;
 import org.cooney.world.map.GridItem;
+import org.cooney.world.map.Seeder;
 import org.cooney.world.utils.ChanceUtils;
 
 import java.util.*;
@@ -15,19 +14,21 @@ import java.util.stream.IntStream;
 
 public class WorldEngine {
 
-    private static final int VIEW_RANGE = 20;
+    private static final int VIEW_RANGE = 3;
     private final GridItem[][] world;
 
     private final List<Actor> actorsInWorld;
 
     private final Map<WorldItem, int[]> coordsLookupMap;
 
-    private List<Thread> actorThreads;
+    private final List<Thread> actorThreads;
+
+
 
     private final int width;
     private final int height;
 
-    public WorldEngine(int height, int width) {
+    public WorldEngine(int height, int width, Seeder seeder) {
         this.world = new GridItem[height][width];
         this.width = width;
         this.height = height;
@@ -35,37 +36,21 @@ public class WorldEngine {
         actorsInWorld = new ArrayList<>();
         actorThreads = new ArrayList<>();
 
-        seedEmptyWorld();
+        seeder.seedWorld(this);
+        populateOptimizedDataStructures();
     }
-    private void seedEmptyWorld() {
-        // Need to make a world and seed it.
+
+    private void populateOptimizedDataStructures() {
         for(int y = 0; y < height; y++) {
             for(int x = 0; x < width; x++) {
-                WorldItem worldItem = decideWorldItemByChance();
-                this.putItemAt(y, x, worldItem);
+                WorldItem worldItem = world[y][x].getWorldItem();
 
-                this.coordsLookupMap.put(worldItem, new int[]{y, x});
+                if (worldItem.getWorldItemId() == WorldItemIds.LIVING_THING_ID) {
+                    this.coordsLookupMap.put(worldItem, new int[]{y, x});
+                    this.actorsInWorld.add((Actor)worldItem);
+                }
             }
         }
-    }
-    private WorldItem decideWorldItemByChance() {
-        boolean isLivingThing = ChanceUtils.rollTheDice(0.3);
-
-        if (isLivingThing) {
-            LivingThing lt = new LivingThing(this);
-            actorsInWorld.add(lt);
-            return lt;
-        }
-
-        boolean isFood = ChanceUtils.rollTheDice(0.4);
-
-        if (isFood) return new Food();
-
-        boolean isWater = ChanceUtils.rollTheDice(0.3);
-
-        if (isWater) return new Water();
-
-        return new EmptyWorldItem();
     }
 
     public List<GridItem> getGridItemsActorCanSee(Actor actor) {
@@ -73,9 +58,19 @@ public class WorldEngine {
         return getGridItemsAroundCoordinates(coordinates, VIEW_RANGE);
     }
 
+    public List<GridItem> getGridItemsInLineOfSight(Actor actor, Direction direction) {
+        int[][] coordsInLineOfSight = new int[9][2];
+        int[] coords = coordsLookupMap.get(actor);
+
+        // Something about looping over an offset and multiply the range values by the offset
+        // To compute the line of sight in a given direction. The signs are already in the Direction.
+
+        return null;
+    }
+
     public List<GridItem> getGridItemsActorCanInteractWith(Actor actor) {
         int[] coordinates = coordsLookupMap.get(actor);
-        return getGridItemsAroundCoordinates(coordinates, 2);
+        return getGridItemsAroundCoordinates(coordinates, 1);
     }
 
     private List<GridItem> getGridItemsAroundCoordinates(int[] coordinates, int range) {
@@ -90,7 +85,7 @@ public class WorldEngine {
         int y = coordinates[0];
         int x = coordinates[1];
 
-        int[][] allSurroundingCoords = new int[1680][2];
+        int[][] allSurroundingCoords = new int[48][2];
 
         int count = 0;
 
@@ -105,11 +100,57 @@ public class WorldEngine {
         return allSurroundingCoords;
     }
 
+    public void addActorNextToActor(Actor existingItem, Actor newItem) {
+        int[] currentCoords = coordsLookupMap.get(existingItem);
+        int[] newCoords = new int[]{Math.floorMod(currentCoords[0] + 1, height), Math.floorMod(currentCoords[1] + 1, width)};
+        coordsLookupMap.put(newItem, newCoords);
+        actorsInWorld.add(newItem);
+        this.putItemAt(newCoords[0], newCoords[1], newItem);
+    }
+
     public void begin() {
         for(Actor actor : actorsInWorld) {
             Thread t = new Thread(actor::wakeUp);
             actorThreads.add(t);
             t.start();
+        }
+
+        Thread reproduceThread = new Thread(() -> {
+            try {
+                reproduceInPopulation();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        reproduceThread.start();
+    }
+
+    private void asyncWakeUp(Actor actor) {
+        Thread t = new Thread(actor::wakeUp);
+        actorThreads.add(t);
+        t.start();
+    }
+
+    private void reproduceInPopulation() throws InterruptedException {
+        while(true) {
+            Thread.sleep(10000);
+            System.out.println("Reproduce Cycle Occurring");
+
+            List<Breeder> breeders = actorsInWorld.stream().filter(Actor::isAlive).map(actor -> ((Breeder)actor)).toList();
+            List<Breeder> orderedByPerformance = breeders.stream()
+                    .sorted(Comparator.comparingInt(Breeder::getFitnessScore).reversed()).toList();
+            System.out.println(orderedByPerformance.size() + " living things fit to breed. The top 3 will reproduce.");
+
+            System.out.println(orderedByPerformance.stream().map(Breeder::getFitnessScore).toList().toString());
+
+            int newChildCount = Math.min(orderedByPerformance.size(), 3);
+
+            for(int x = 0; x < newChildCount; x++) {
+                LivingThing parent = (LivingThing) orderedByPerformance.get(x);
+                LivingThing child = new LivingThing(this, parent.getNeuralNetwork(), 0.05);
+                this.addActorNextToActor(parent, child);
+                asyncWakeUp(child);
+            }
         }
     }
 
@@ -141,5 +182,13 @@ public class WorldEngine {
 
     public GridItem getItemAt(int y, int x) {
         return world[y][x];
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
     }
 }

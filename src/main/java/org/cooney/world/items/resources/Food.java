@@ -15,7 +15,9 @@ public class Food implements WorldItem, Consumable {
     @Override
     public void consume(Actor actor) {
         if (resourceCount > 0) {
-            resourceCount--;
+            // resourceCount --;
+        } else {
+            System.out.println("FOOD SOURCE DEPLETED");
         }
     }
 
