@@ -2,21 +2,21 @@ package org.cooney.neural;
 
 public class NeuralNetworkTrainingData {
     private final double[][] validInputs;
-    private final double[] scores;
+    private final double[] rewards;
 
     private final double[][] newState;
 
     private final int[] actionsTaken;
 
-    public NeuralNetworkTrainingData(double[][] validInputs, double[] scores, double[][] newState, int[] actionsTaken) throws InvalidTrainingDataException {
+    public NeuralNetworkTrainingData(double[][] validInputs, double[] rewards, double[][] newState, int[] actionsTaken) throws InvalidTrainingDataException {
         this.actionsTaken = actionsTaken;
 
-        if (!(validInputs.length == newState.length && scores.length == newState.length && actionsTaken.length == newState.length)) {
+        if (!(validInputs.length == newState.length && rewards.length == newState.length && actionsTaken.length == newState.length)) {
             throw new InvalidTrainingDataException();
         }
 
         this.validInputs = validInputs;
-        this.scores = scores;
+        this.rewards = rewards;
         this.newState = newState;
     }
 
@@ -24,8 +24,8 @@ public class NeuralNetworkTrainingData {
         return validInputs[index];
     }
 
-    public double getScoreAtIndex(int index) {
-        return scores[index];
+    public double getRewardAtIndex(int index) {
+        return rewards[index];
     }
 
     public double[] getNewStateAtIndex(int index) {

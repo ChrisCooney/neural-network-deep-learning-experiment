@@ -14,54 +14,82 @@ import org.cooney.world.items.resources.Water;
 import org.cooney.world.map.GridItem;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.DoubleStream;
 
 public class LivingThing implements Actor, WorldItem, Learner {
 
     private static final int MEDITATION_CADENCE_IN_TICKS = 100;
+    private static final int EXPLORATION_DEGRADE_CADENCE_IN_TICKS = 300;
     private static final int MAX_MEMORY_SIZE = 10000;
-
     private final NeuralNetwork neuralNetwork;
     private final List<LivingThingMemory> memory;
-
     private final WorldEngine outsideWorld;
-
     private double hunger;
-
     private double thirst;
-
     private double isolation;
+    private double explorationRate = 0.95;
+    private int ticks;
 
-    private int ticksSinceLastMeditation;
+    private boolean alive = true;
 
     public LivingThing(WorldEngine outsideWorld) {
-        neuralNetwork = new NeuralNetwork(8, 30, 9, 0.01);
+        neuralNetwork = new NeuralNetwork(1683, 7000, 9, 0.05);
         this.memory = new ArrayList<>();
 
         this.hunger = 0;
         this.thirst = 0;
         this.isolation = 0;
-        this.ticksSinceLastMeditation = 0;
+        this.ticks = 0;
 
         this.outsideWorld = outsideWorld;
+    }
+
+    public void wakeUp() {
+        while(alive) {
+            List<GridItem> gridItemsICanSee = outsideWorld.getGridItemsActorCanSee(this);
+            act(gridItemsICanSee);
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                // it's okay if the thread is interrupted. Catch and swallow.
+            }
+        }
     }
 
     @Override
     public void act(List<GridItem> gridItems) {
         double[] input = gridItemsToNetworkInput(gridItems);
 
-        try {
-            if (ticksSinceLastMeditation < MEDITATION_CADENCE_IN_TICKS) {
-                makeAMove(input);
-            } else {
-                learn();
-                ticksSinceLastMeditation = 0;
-            }
+        ticks ++;
 
+        try {
+            if (alive) {
+                if (ticks % MEDITATION_CADENCE_IN_TICKS == 0) {
+                    learn();
+                } else {
+                    makeAMove(input);
+                    if (hunger > 1000 || thirst > 1000 || isolation > 1000) {
+                        alive = false;
+                    }
+                }
+
+                if (ticks % EXPLORATION_DEGRADE_CADENCE_IN_TICKS == 0) {
+                    degradeExplorationRate();
+                }
+            }
         } catch (InvalidMatrixShapeException | InvalidTrainingDataException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void degradeExplorationRate() {
+        if (this.explorationRate > 0) {
+            this.explorationRate = this.explorationRate - 0.1;
+            System.out.println("DEGRADING EXPLORATION RATE!!!! - " + this.explorationRate);
         }
     }
 
@@ -77,15 +105,24 @@ public class LivingThing implements Actor, WorldItem, Learner {
         Direction direction = decide(input);
         move(direction);
         List<GridItem> surroundingGridItems = lookAround();
-        double[] newStats = consumeResources(surroundingGridItems);
+        List<GridItem> consumableGridItems = outsideWorld.getGridItemsActorCanInteractWith(this);
+        double[] newStats = consumeResources(consumableGridItems);
         double moveScore = scoreTheMoveIMade(newStats);
+        rememberThisDecision(input, moveScore, gridItemsToNetworkInput(surroundingGridItems), newStats, direction);
         updateMyStats(newStats);
-        rememberThisDecision(input, moveScore, gridItemsToNetworkInput(surroundingGridItems), direction);
-        this.ticksSinceLastMeditation ++;
+
+        this.ticks++;
     }
 
-    private void rememberThisDecision(double[] input, double moveScore, double[] newSurroundingItems, Direction direction) {
-        this.memory.add(new LivingThingMemory(input, moveScore, newSurroundingItems, direction));
+    private void rememberThisDecision(double[] input, double moveScore, double[] newSurroundingItems, double[] newStats, Direction direction) {
+
+        double[] statsArr = new double[]{this.hunger, this.thirst, this.isolation};
+
+        if (moveScore > 0) {
+            System.out.println("I made a move to " + direction.toString() + " and it scored " + moveScore + " and my stats were " + Arrays.toString(statsArr) + " and after the move they were " + Arrays.toString(newStats));
+        }
+
+        this.memory.add(new LivingThingMemory(input, statsArr, moveScore, newSurroundingItems, newStats, direction));
 
         if (this.memory.size() > MAX_MEMORY_SIZE) {
             // Get rid of the oldest memory from the working set.
@@ -102,29 +139,39 @@ public class LivingThing implements Actor, WorldItem, Learner {
     private double scoreTheMoveIMade(double[] newStats) {
         double score = 0;
 
-        if (hunger > thirst && hunger > isolation) {
+        boolean hungerIsPrimaryConcern = hunger > thirst && hunger > isolation && hunger > 100;
+        boolean thirstIsPrimaryConcern = thirst > hunger && thirst > isolation && thirst > 100;
+        boolean isolationIsPrimaryConcern = isolation > hunger && isolation > thirst && isolation > 100;
+
+        // If they deal with their primary concern, they get 10 points.
+        if (hungerIsPrimaryConcern) {
             // Hunger is the primary motivator. Score based on that.
             if (newStats[0] < hunger) {
                 // We reduced hunger and that was the goal! Yay!
                 score += 10;
             }
+        } else if (hunger > 200 && newStats[0] < hunger) {
+            // Hunger is a secondary concern, so give some points.
+            score += 5;
         }
 
-        if (thirst > hunger && thirst > isolation) {
+        if (thirstIsPrimaryConcern) {
             // Thirst is the most important...
             if (newStats[1] < thirst) {
                 score += 10;
             }
+        } else if (thirst > 200 && newStats[1] < thirst) {
+            score += 5;
         }
 
-        if (isolation > hunger && isolation > thirst) {
+        if (isolationIsPrimaryConcern) {
             // Isolation is the most important...
             if (newStats[2] < isolation) {
                 score += 10;
             }
+        } else if (isolation > 200 && newStats[2] < isolation) {
+            score += 5;
         }
-
-        System.out.println("SCORE: " + score);
 
         return score;
     }
@@ -138,27 +185,29 @@ public class LivingThing implements Actor, WorldItem, Learner {
 
         if (!mappedById.containsKey(WorldItemIds.FOOD_ID)) {
             newStats[0] = this.hunger + 1;
-        } else {
+        } else if (this.hunger > 100) {
             mappedById.get(WorldItemIds.FOOD_ID).stream()
                     .map(worldItem -> (Food)worldItem)
                     .max((f1, f2) -> (int) (f1.getResourceCount() - f2.getResourceCount()))
                     .ifPresent((bestFoodSource) -> {
-                        bestFoodSource.consume(this);
-                        newStats[0] = 0;
+                        if (bestFoodSource.getResourceCount() > 0) {
+                            bestFoodSource.consume(this);
+                            newStats[0] = 0;
+                        }
                     });
         }
 
-
-
         if (!mappedById.containsKey(WorldItemIds.WATER_ID)) {
             newStats[1] = this.thirst + 1;
-        } else {
+        } else if (this.thirst > 100) {
             mappedById.get(WorldItemIds.WATER_ID).stream()
                     .map(worldItem -> (Water) worldItem)
                     .max((w1, w2) -> (int) (w1.getResourceCount() - w2.getResourceCount()))
                     .ifPresent((bestWaterSource) -> {
-                        bestWaterSource.consume(this);
-                        newStats[1] = 0;
+                        if (bestWaterSource.getResourceCount() > 0) {
+                            bestWaterSource.consume(this);
+                            newStats[1] = 0;
+                        }
                     });
         }
 
@@ -166,14 +215,14 @@ public class LivingThing implements Actor, WorldItem, Learner {
         if (!mappedById.containsKey(WorldItemIds.LIVING_THING_ID)) {
             newStats[2] = this.isolation + 1;
         } else {
-            newStats[2] = this.isolation > 0 ? this.isolation - 1 : 0;
+            newStats[2] = this.isolation < 100 ? 0 : this.isolation - 100;
         }
 
         return newStats;
     }
 
     private List<GridItem> lookAround() {
-        return outsideWorld.getGridItemsAroundActor(this);
+        return outsideWorld.getGridItemsActorCanSee(this);
     }
 
     private void move(Direction direction) {
@@ -184,7 +233,14 @@ public class LivingThing implements Actor, WorldItem, Learner {
     }
 
     private Direction decide(double[] networkInput) throws InvalidMatrixShapeException {
-        double[] possibleQValues = neuralNetwork.predict(networkInput);
+
+        if (shouldSelectRandomDirection()) {
+            return Direction.randomDirection();
+        }
+
+        double[] statsArray = new double[]{this.hunger, this.thirst, this.isolation};
+
+        double[] possibleQValues = neuralNetwork.predict(buildNeuralNetworkInputArray(networkInput, statsArray));
 
         int indexOfMax = -1;
         double temp = -1;
@@ -198,9 +254,17 @@ public class LivingThing implements Actor, WorldItem, Learner {
 
         Direction d = Direction.getFromIndex(indexOfMax);
 
-        System.out.printf("I am deciding to go %s - My Stats are Hunger = %f, Thirst = %f, Isolation = %f%n", d.toString(), this.hunger, this.thirst, this.isolation);
+        //System.out.printf("I am deciding to go %s with Q Value of %f - My Stats are Hunger = %f, Thirst = %f, Isolation = %f%n", d.toString(), temp, this.hunger, this.thirst, this.isolation);
 
         return Direction.getFromIndex(indexOfMax);
+    }
+
+    private boolean shouldSelectRandomDirection() {
+        return Math.random() < this.explorationRate;
+    }
+
+    private double[] buildNeuralNetworkInputArray(double[] surroundingItemsNetworkInput, double[] statsArray) {
+        return DoubleStream.concat(Arrays.stream(surroundingItemsNetworkInput), Arrays.stream(statsArray)).toArray();
     }
 
     @Override
@@ -211,13 +275,13 @@ public class LivingThing implements Actor, WorldItem, Learner {
             return;
         }
 
-        double[][] inputs = new double[memory.size()][8];
+        double[][] inputs = new double[memory.size()][11];
         double[] scores = new double[memory.size()];
-        double[][] newSurroundingItems = new double[memory.size()][8];
+        double[][] newSurroundingItems = new double[memory.size()][memory.get(0).newSurroundingItems().length];
         int[] actionsTaken = new int[memory.size()];
 
         for (int x = 0; x < memory.size(); x++) {
-            inputs[x] = memory.get(x).input();
+            inputs[x] = buildNeuralNetworkInputArray(memory.get(x).oldSurroundingItems(), memory.get(x).stats());
             scores[x] = memory.get(x).score();
             newSurroundingItems[x] = memory.get(x).newSurroundingItems();
             actionsTaken[x] = memory.get(x).action().getIndex();
@@ -229,7 +293,11 @@ public class LivingThing implements Actor, WorldItem, Learner {
 
     @Override
     public String getCharacterCode() {
-        return " ";
+        if (!alive) {
+            return "X";
+        } else {
+            return "O";
+        }
     }
 
     @Override
@@ -239,8 +307,23 @@ public class LivingThing implements Actor, WorldItem, Learner {
 
     @Override
     public String getColourCode() {
-        return "RED";
+        if (!alive) {
+            return "BLACK";
+        }
+
+        if (this.hunger > this.thirst && this.hunger > this.isolation && hunger > 200) {
+            return "YELLOW";
+        }
+
+        if (this.thirst > this.hunger && this.thirst > this.isolation && thirst > 200) {
+            return "BLUE";
+        }
+
+        if (this.isolation > this.hunger && this.isolation > this.thirst && isolation > 200) {
+            return "RED";
+        }
+
+        return "WHITE";
     }
 }
 
-record LivingThingMemory(double[] input, double score, double[] newSurroundingItems, Direction action) {}

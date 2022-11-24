@@ -3,6 +3,7 @@ package org.cooney.world;
 import org.cooney.world.items.Actor;
 import org.cooney.world.items.EmptyWorldItem;
 import org.cooney.world.items.WorldItem;
+import org.cooney.world.items.WorldItemIds;
 import org.cooney.world.items.agents.LivingThing;
 import org.cooney.world.items.resources.Food;
 import org.cooney.world.items.resources.Water;
@@ -10,13 +11,18 @@ import org.cooney.world.map.GridItem;
 import org.cooney.world.utils.ChanceUtils;
 
 import java.util.*;
+import java.util.stream.IntStream;
 
 public class WorldEngine {
+
+    private static final int VIEW_RANGE = 20;
     private final GridItem[][] world;
 
     private final List<Actor> actorsInWorld;
 
     private final Map<WorldItem, int[]> coordsLookupMap;
+
+    private List<Thread> actorThreads;
 
     private final int width;
     private final int height;
@@ -27,6 +33,7 @@ public class WorldEngine {
         this.height = height;
         coordsLookupMap = new HashMap<>();
         actorsInWorld = new ArrayList<>();
+        actorThreads = new ArrayList<>();
 
         seedEmptyWorld();
     }
@@ -42,7 +49,7 @@ public class WorldEngine {
         }
     }
     private WorldItem decideWorldItemByChance() {
-        boolean isLivingThing = ChanceUtils.rollTheDice(0.09);
+        boolean isLivingThing = ChanceUtils.rollTheDice(0.3);
 
         if (isLivingThing) {
             LivingThing lt = new LivingThing(this);
@@ -50,53 +57,59 @@ public class WorldEngine {
             return lt;
         }
 
-        boolean isFood = ChanceUtils.rollTheDice(0.5);
+        boolean isFood = ChanceUtils.rollTheDice(0.4);
 
         if (isFood) return new Food();
 
-        boolean isWater = ChanceUtils.rollTheDice(0.5);
+        boolean isWater = ChanceUtils.rollTheDice(0.3);
 
         if (isWater) return new Water();
 
         return new EmptyWorldItem();
     }
 
-    public List<GridItem> getGridItemsAroundActor(Actor actor) {
+    public List<GridItem> getGridItemsActorCanSee(Actor actor) {
         int[] coordinates = coordsLookupMap.get(actor);
-        return getGridItemsAroundCoordinates(coordinates);
+        return getGridItemsAroundCoordinates(coordinates, VIEW_RANGE);
     }
 
-    private List<GridItem> getGridItemsAroundCoordinates(int[] coordinates) {
-        int[][] surroundingCoords = getSurroundingCoordinates(coordinates);
+    public List<GridItem> getGridItemsActorCanInteractWith(Actor actor) {
+        int[] coordinates = coordsLookupMap.get(actor);
+        return getGridItemsAroundCoordinates(coordinates, 2);
+    }
+
+    private List<GridItem> getGridItemsAroundCoordinates(int[] coordinates, int range) {
+        int[] coordinateDeltas = IntStream.range(range * -1, range + 1).toArray();
+        int[][] surroundingCoords = getSurroundingCoordinates(coordinates, coordinateDeltas);
 
         return Arrays.stream(surroundingCoords)
                 .map(coords -> getItemAt(coords[0], coords[1])).toList();
     }
 
-    private int[][] getSurroundingCoordinates(int[] coordinates) {
+    private int[][] getSurroundingCoordinates(int[] coordinates, int[] coordinateDeltas) {
         int y = coordinates[0];
         int x = coordinates[1];
 
-        int[][] allSurroundingCoords = new int[8][2];
+        int[][] allSurroundingCoords = new int[1680][2];
 
-        allSurroundingCoords[0] = new int[]{Math.floorMod(y + 1,height), x};
-        allSurroundingCoords[1] = new int[]{Math.floorMod(y - 1,height), x};
-        allSurroundingCoords[2] = new int[]{Math.floorMod(y + 1,height), Math.floorMod(x + 1,width)};
-        allSurroundingCoords[3] = new int[]{Math.floorMod(y + 1,height), Math.floorMod(x - 1,width)};
-        allSurroundingCoords[4] = new int[]{y, Math.floorMod(x + 1, width)};
-        allSurroundingCoords[5] = new int[]{y, Math.floorMod(x - 1, width)};
-        allSurroundingCoords[6] = new int[]{Math.floorMod(y - 1,height), Math.floorMod(x - 1,width)};
-        allSurroundingCoords[7] = new int[]{Math.floorMod(y - 1,height), Math.floorMod(x + 1,width)};
+        int count = 0;
+
+        for(int dx : coordinateDeltas) {
+            for(int dy : coordinateDeltas) {
+                if (dx == 0 && dy == 0) continue;
+                allSurroundingCoords[count] = new int[]{Math.floorMod(y + dy,height), Math.floorMod(x + dx,width)};
+                count ++;
+            }
+        }
 
         return allSurroundingCoords;
     }
 
-    public void tick() {
+    public void begin() {
         for(Actor actor : actorsInWorld) {
-            int[] actorCoords = coordsLookupMap.get(actor);
-            List<GridItem> surroundingItems = getGridItemsAroundCoordinates(actorCoords);
-
-            actor.act(surroundingItems);
+            Thread t = new Thread(actor::wakeUp);
+            actorThreads.add(t);
+            t.start();
         }
     }
 
@@ -109,7 +122,13 @@ public class WorldEngine {
         int newY = Math.floorMod(oldY + yDelta, height);
         int newX = Math.floorMod(oldX + xDelta, width);
 
-        putItemAt(oldY, oldX, world[newY][newX].getWorldItem());
+        if (world[newY][newX].getWorldItem().getWorldItemId() != WorldItemIds.LIVING_THING_ID) {
+            // Prevent the living things from trampling food and water out of existence.
+            putItemAt(oldY, oldX, world[newY][newX].getWorldItem());
+        } else {
+            putItemAt(oldY, oldX, new EmptyWorldItem());
+        }
+
         putItemAt(newY, newX, actor);
 
         coordsLookupMap.put(actor, new int[]{newY, newX});

@@ -9,8 +9,8 @@ import org.cooney.world.items.WorldItem;
 import java.io.IOException;
 
 public class WorldView {
-    private static final int WORLD_HEIGHT = 50;
-    private static final int WORLD_WIDTH = 50;
+    private static final int WORLD_HEIGHT = 90;
+    private static final int WORLD_WIDTH = 80;
     private final WorldEngine worldEngine = new WorldEngine(WORLD_HEIGHT, WORLD_WIDTH);
     public void render(Terminal terminal) throws IOException {
         for(int y = 0; y < WORLD_HEIGHT; y++) {
@@ -26,14 +26,14 @@ public class WorldView {
     }
     public void run() {
         try {
-            Terminal terminal = new DefaultTerminalFactory().setTerminalEmulatorFontConfiguration(SwingTerminalFontConfiguration.getDefaultOfSize(5)).createTerminal();
+            worldEngine.begin();
+            Terminal terminal = new DefaultTerminalFactory().setTerminalEmulatorFontConfiguration(SwingTerminalFontConfiguration.getDefaultOfSize(10)).createTerminal();
 
             while(true) {
                 terminal.clearScreen();
                 render(terminal);
                 terminal.flush();
-                worldEngine.tick();
-                Thread.sleep(10);
+                Thread.sleep(100);
             }
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);

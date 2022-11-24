@@ -22,6 +22,10 @@ public enum Direction {
         this.yDirection = yDirection;
     }
 
+    public static Direction randomDirection() {
+        return values()[(int) (Math.random() * (values().length - 1))];
+    }
+
     public int getIndex() {
         return index;
     }

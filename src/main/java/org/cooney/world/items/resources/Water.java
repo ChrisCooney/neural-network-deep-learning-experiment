@@ -9,7 +9,7 @@ import org.cooney.world.utils.ChanceUtils;
 public class Water implements Consumable, WorldItem {
 
     private static final double MAX_RESOURCE_COUNT = 30;
-    private double resourceCount = 30;
+    private double resourceCount = 300;
     @Override
     public void consume(Actor actor) {
         this.resourceCount --;
@@ -44,6 +44,6 @@ public class Water implements Consumable, WorldItem {
 
     @Override
     public String getColourCode() {
-        return "BLUE";
+        return resourceCount > 0 ? "BLUE": "GREY";
     }
 }

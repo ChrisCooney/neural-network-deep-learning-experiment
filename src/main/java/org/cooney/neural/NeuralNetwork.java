@@ -127,7 +127,7 @@ public class NeuralNetwork {
 
             double[] input = trainingData.getInputAtIndex(randomIndex);
             double[] newState = trainingData.getNewStateAtIndex(randomIndex);
-            double score = trainingData.getScoreAtIndex(randomIndex);
+            double score = trainingData.getRewardAtIndex(randomIndex);
             int action = trainingData.getActionAtIndex(randomIndex);
 
             this.qLearning(input, score, newState, action);

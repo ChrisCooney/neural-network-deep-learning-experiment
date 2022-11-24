@@ -14,7 +14,9 @@ public class Food implements WorldItem, Consumable {
 
     @Override
     public void consume(Actor actor) {
-        resourceCount--;
+        if (resourceCount > 0) {
+            resourceCount--;
+        }
     }
 
     @Override
@@ -25,7 +27,7 @@ public class Food implements WorldItem, Consumable {
     @Override
     public void regenerate() {
         if (resourceCount < MAX_RESOURCE_COUNT) {
-            resourceCount ++;
+            resourceCount += 5;
         }
     }
 
@@ -46,6 +48,6 @@ public class Food implements WorldItem, Consumable {
 
     @Override
     public String getColourCode() {
-        return "GREEN";
+        return resourceCount > 0 ? "GREEN" : "YELLOW";
     }
 }
