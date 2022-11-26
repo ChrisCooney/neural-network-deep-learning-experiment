@@ -1,15 +1,10 @@
 package org.cooney.world;
 
-import com.googlecode.lanterna.TextColor;
-import org.cooney.neural.NeuralNetwork;
 import org.cooney.world.items.*;
 import org.cooney.world.items.agents.Direction;
 import org.cooney.world.items.agents.LivingThing;
-import org.cooney.world.items.resources.Food;
-import org.cooney.world.items.resources.Water;
 import org.cooney.world.map.GridItem;
 import org.cooney.world.map.Seeder;
-import org.cooney.world.utils.ChanceUtils;
 
 import java.util.*;
 import java.util.stream.IntStream;
@@ -137,9 +132,7 @@ public class WorldEngine {
         return allSurroundingCoords;
     }
 
-    public void addActorNextToActor(Actor existingItem, Actor newItem) {
-        int[] currentCoords = coordsLookupMap.get(existingItem);
-
+    public void addActorInRandomPlace(Actor newItem) {
         int randomY = (int)(Math.random() * height - 1);
         int randomX = (int)(Math.random() * width - 1);
 
@@ -174,8 +167,13 @@ public class WorldEngine {
 
     private void reproduceInPopulation() throws InterruptedException {
         while(true) {
-            Thread.sleep(10000);
+            Thread.sleep(7000);
             System.out.println("Reproduce Cycle Occurring");
+
+            if (actorsInWorld.size() > 25) {
+                System.out.println("Already at population cap.");
+                continue;
+            }
 
             List<Breeder> breeders = actorsInWorld.stream().filter(Actor::isAlive).map(actor -> ((Breeder)actor)).toList();
             List<Breeder> orderedByPerformance = breeders.stream()
@@ -189,17 +187,13 @@ public class WorldEngine {
             for(int x = 0; x < newChildCount; x++) {
                 LivingThing parent = (LivingThing) orderedByPerformance.get(x);
 
-                boolean inheritsBrain = Math.random() > 0.5;
+                boolean inheritsBrain = true;
 
                 LivingThing child;
 
-                if (inheritsBrain) {
-                    child = new LivingThing(this, parent.getNeuralNetwork(), 0.95, parent.getTicks());
-                } else {
-                    child = new LivingThing(this, 0.95, parent.getTicks());
-                }
+                child = new LivingThing(this, parent.getNeuralNetwork(), 0.05, parent.getTicks());
 
-                this.addActorNextToActor(parent, child);
+                this.addActorInRandomPlace(child);
                 asyncWakeUp(child);
             }
         }

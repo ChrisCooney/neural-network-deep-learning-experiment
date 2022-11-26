@@ -52,6 +52,11 @@ public class WorldView {
 
             int[] coords = worldEngine.getActorCoords(actor);
 
+            if (coords == null) {
+                System.out.println("Race condition detected. Let's move on from this swiftly...");
+                continue;
+            }
+
             if (!actor.isAlive()) {
                 continue;
             }

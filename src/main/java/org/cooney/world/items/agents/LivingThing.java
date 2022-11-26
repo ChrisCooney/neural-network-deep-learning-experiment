@@ -92,7 +92,7 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
             List<GridItem> gridItemsICanSee = outsideWorld.getGridItemsInActorLineOfSight(this);
             act(gridItemsICanSee);
             try {
-                if (ticks < 3000) {
+                if (ticks < 100000) {
                     //Thread.sleep(0);
                 } else {
                     Thread.sleep(50);
