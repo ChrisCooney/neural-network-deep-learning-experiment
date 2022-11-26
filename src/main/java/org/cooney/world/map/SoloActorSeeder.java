@@ -7,11 +7,7 @@ import org.cooney.world.items.agents.LivingThing;
 import org.cooney.world.items.resources.Food;
 import org.cooney.world.items.resources.Water;
 
-public class RandomWorldSeeder implements Seeder {
-
-    private static final double LIVING_THING_CHANCE = 0.005;
-    private static final double FOOD_CHANCE = 0.03;
-    private static final double WATER_CHANCE = 0.05;
+public class SoloActorSeeder implements Seeder {
 
     @Override
     public void seedWorld(WorldEngine worldEngine) {
@@ -22,20 +18,22 @@ public class RandomWorldSeeder implements Seeder {
                 worldEngine.putItemAt(y, x, worldItem);
             }
         }
+
+        int xRand = (int) (Math.random() * worldEngine.getWidth());
+        int yRand = (int) (Math.random() * worldEngine.getHeight());
+
+        worldEngine.putItemAt(yRand, xRand, new LivingThing(worldEngine));
     }
 
     protected WorldItem decideWorldItemByChance(WorldEngine worldEngine) {
-        double relativeLivingThingChance = LIVING_THING_CHANCE / 4;
-        double relativeFoodChance = FOOD_CHANCE / 4;
-        double relativeWaterChance = WATER_CHANCE / 4;
+        double relativeFoodChance = 0.05 / 3;
+        double relativeWaterChance = 0.03 / 3;
 
         double random = Math.random();
 
-        if (random <= relativeLivingThingChance) {
-            return new LivingThing(worldEngine);
-        } else if (random <= (relativeLivingThingChance + relativeFoodChance)) {
+        if (random <= (relativeFoodChance)) {
             return new Food();
-        } else if (random <= (relativeLivingThingChance + relativeFoodChance + relativeWaterChance)) {
+        } else if (random <= (relativeFoodChance + relativeWaterChance)) {
             return new Water();
         } else {
             return new EmptyWorldItem();

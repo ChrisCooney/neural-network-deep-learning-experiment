@@ -36,7 +36,7 @@ public class RiverWorldSeeder implements Seeder {
 
     private WorldItem randomlySelectWorldItem(WorldEngine worldEngine) {
         double relativeLivingThingChance = 0.01/3;
-        double relativeFoodChance = 0.04/3;
+        double relativeFoodChance = 0.015/3;
 
         double random = Math.random();
 

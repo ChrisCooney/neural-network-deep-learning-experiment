@@ -32,30 +32,55 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
     private double explorationRate = 0.95;
     private int ticks;
 
+    private Direction currentDirection = Direction.DOWN;
+
+    private Direction previousDirection = Direction.DOWN;
+
     private int totalScore;
 
     private boolean alive = true;
 
+    private double energy;
+
     public LivingThing(WorldEngine outsideWorld) {
-        neuralNetwork = new NeuralNetwork(49, 400, 9, 0.05);
+        neuralNetwork = new NeuralNetwork(7, 500, 5, 0.1);
         this.memory = new ArrayList<>();
 
         this.hunger = 0;
         this.thirst = 0;
         this.isolation = 0;
         this.ticks = 0;
+        this.energy = 500;
 
         this.outsideWorld = outsideWorld;
     }
 
-    public LivingThing(WorldEngine outsideWorld, NeuralNetwork neuralNetwork, double explorationRate) {
+    public LivingThing(WorldEngine outsideWorld, double explorationRate, int ticks) {
+        this.neuralNetwork = new NeuralNetwork(7, 500, 5, 0.1);;
+        this.memory = new ArrayList<>();
+
+        this.hunger = 0;
+        this.thirst = 0;
+        this.isolation = 0;
+
+        this.ticks = ticks;
+        this.energy = 500;
+
+        this.outsideWorld = outsideWorld;
+
+        this.explorationRate = explorationRate;
+    }
+
+    public LivingThing(WorldEngine outsideWorld, NeuralNetwork neuralNetwork, double explorationRate, int ticks) {
         this.neuralNetwork = neuralNetwork;
         this.memory = new ArrayList<>();
 
         this.hunger = 0;
         this.thirst = 0;
         this.isolation = 0;
-        this.ticks = 0;
+
+        this.ticks = ticks;
+        this.energy = 500;
 
         this.outsideWorld = outsideWorld;
 
@@ -64,14 +89,21 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
 
     public void wakeUp() {
         while(alive) {
-            List<GridItem> gridItemsICanSee = outsideWorld.getGridItemsActorCanSee(this);
+            List<GridItem> gridItemsICanSee = outsideWorld.getGridItemsInActorLineOfSight(this);
             act(gridItemsICanSee);
             try {
-                Thread.sleep(100);
+                if (ticks < 3000) {
+                    //Thread.sleep(0);
+                } else {
+                    Thread.sleep(50);
+                }
+
             } catch (InterruptedException e) {
                 // it's okay if the thread is interrupted. Catch and swallow.
             }
         }
+
+        outsideWorld.cleanUpCorpse(this);
     }
 
     @Override
@@ -118,17 +150,28 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
     private void makeAMove(double[] input) throws InvalidMatrixShapeException {
         Direction direction = decide(input);
         move(direction);
+
+        // If it went from moving to staying still, keep the previous direction set to what it was already.
+        // If they've gone from moving in one direction to another, track the previous direction.
+        this.previousDirection = this.currentDirection == Direction.STAY_STILL ? this.previousDirection : this.currentDirection;
+        this.currentDirection = direction;
         List<GridItem> surroundingGridItems = lookAround();
         List<GridItem> consumableGridItems = outsideWorld.getGridItemsActorCanInteractWith(this);
         double[] newStats = consumeResources(consumableGridItems);
         double moveScore = scoreTheMoveIMade(newStats);
         rememberThisDecision(input, moveScore, gridItemsToNetworkInput(surroundingGridItems), newStats, direction);
         updateMyStats(newStats);
+
+        if (direction != Direction.STAY_STILL) {
+            energy = energy - 1;
+        } else {
+            energy += 100;
+        }
     }
 
     private void rememberThisDecision(double[] input, double moveScore, double[] newSurroundingItems, double[] newStats, Direction direction) {
 
-        double[] statsArr = new double[]{this.hunger, this.thirst, this.isolation};
+        double[] statsArr = new double[]{this.hunger, this.thirst, this.isolation, this.energy};
 
         if (moveScore > 0) {
            // System.out.println("I made a move to " + direction.toString() + " and it scored " + moveScore + " and my stats were " + Arrays.toString(statsArr) + " and after the move they were " + Arrays.toString(newStats));
@@ -146,6 +189,7 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
         this.hunger = newStats[0];
         this.thirst = newStats[1];
         this.isolation = newStats[2];
+        this.energy = newStats[3];
     }
 
     private double scoreTheMoveIMade(double[] newStats) {
@@ -155,34 +199,37 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
         boolean thirstIsPrimaryConcern = thirst > hunger && thirst > isolation && thirst > 100;
         boolean isolationIsPrimaryConcern = isolation > hunger && isolation > thirst && isolation > 100;
 
+        final int primaryConcernScoreIncrease = 10;
+        final int secondaryConcernScoreIncrease = 0;
+
         // If they deal with their primary concern, they get 10 points.
         if (hungerIsPrimaryConcern) {
             // Hunger is the primary motivator. Score based on that.
             if (newStats[0] < hunger) {
                 // We reduced hunger and that was the goal! Yay!
-                score += 10;
+                score += primaryConcernScoreIncrease;
             }
         } else if (hunger > 200 && newStats[0] < hunger) {
             // Hunger is a secondary concern, so give some points.
-            score += 5;
+            score += secondaryConcernScoreIncrease;
         }
 
         if (thirstIsPrimaryConcern) {
             // Thirst is the most important...
             if (newStats[1] < thirst) {
-                score += 10;
+                score += primaryConcernScoreIncrease;
             }
         } else if (thirst > 200 && newStats[1] < thirst) {
-            score += 5;
+            score += secondaryConcernScoreIncrease;
         }
 
         if (isolationIsPrimaryConcern) {
             // Isolation is the most important...
             if (newStats[2] < isolation) {
-                score += 10;
+                score += primaryConcernScoreIncrease;
             }
         } else if (isolation > 200 && newStats[2] < isolation) {
-            score += 5;
+            score += secondaryConcernScoreIncrease;
         }
 
         totalScore += score;
@@ -195,7 +242,9 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
         Map<Double, List<WorldItem>> mappedById = gridItems.stream()
                 .map(GridItem::getWorldItem).collect(Collectors.groupingBy(WorldItem::getWorldItemId));
 
-        double[] newStats = new double[3];
+        double[] newStats = new double[4];
+
+        newStats[3] = this.energy;
 
         if (!mappedById.containsKey(WorldItemIds.FOOD_ID)) {
             newStats[0] = this.hunger + 1;
@@ -207,6 +256,7 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
                         if (bestFoodSource.getResourceCount() > 0) {
                             bestFoodSource.consume(this);
                             newStats[0] = this.hunger - 20;
+                            newStats[3] = this.energy + 20;
                         }
                     });
         }
@@ -235,7 +285,7 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
     }
 
     private List<GridItem> lookAround() {
-        return outsideWorld.getGridItemsActorCanSee(this);
+        return outsideWorld.getGridItemsInActorLineOfSight(this);
     }
 
     private void move(Direction direction) {
@@ -247,11 +297,15 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
 
     private Direction decide(double[] networkInput) throws InvalidMatrixShapeException {
 
+        if (energy == 0) {
+            return Direction.STAY_STILL;
+        }
+
         if (shouldSelectRandomDirection()) {
             return Direction.randomDirection();
         }
 
-        double[] statsArray = new double[]{this.hunger, this.thirst, this.isolation};
+        double[] statsArray = new double[]{this.hunger, this.thirst, this.isolation, this.energy};
 
         double[] possibleQValues = neuralNetwork.predict(buildNeuralNetworkInputArray(networkInput, statsArray));
 
@@ -292,7 +346,7 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
             priorityConcernValue = 3;
         }
 
-        return DoubleStream.concat(Arrays.stream(surroundingItemsNetworkInput), Arrays.stream(new double[]{priorityConcernValue})).toArray();
+        return DoubleStream.concat(Arrays.stream(surroundingItemsNetworkInput), Arrays.stream(new double[]{priorityConcernValue, statsArray[3]})).toArray();
     }
 
     @Override
@@ -321,6 +375,11 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
 
     @Override
     public String getCharacterCode() {
+
+        if (this.energy == 0) {
+            return "E";
+        }
+
         if (!alive) {
             return "X";
         } else {
@@ -359,6 +418,15 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
     }
 
     @Override
+    public Direction getDirectionIamFacing() {
+        if (currentDirection == Direction.STAY_STILL) {
+            return previousDirection;
+        } else {
+            return currentDirection;
+        }
+    }
+
+    @Override
     public boolean isFitToBreed() {
         return this.isolation < 200 && this.hunger < 200 && this.thirst < 200;
     }
@@ -370,6 +438,10 @@ public class LivingThing implements Actor, WorldItem, Learner, Breeder {
 
     public NeuralNetwork getNeuralNetwork() {
         return this.neuralNetwork.copy();
+    }
+
+    public int getTicks() {
+        return ticks;
     }
 }
 

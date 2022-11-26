@@ -1,5 +1,7 @@
 package org.cooney.world;
 
+import com.googlecode.lanterna.TextColor;
+import org.cooney.neural.NeuralNetwork;
 import org.cooney.world.items.*;
 import org.cooney.world.items.agents.Direction;
 import org.cooney.world.items.agents.LivingThing;
@@ -53,19 +55,54 @@ public class WorldEngine {
         }
     }
 
-    public List<GridItem> getGridItemsActorCanSee(Actor actor) {
-        int[] coordinates = coordsLookupMap.get(actor);
-        return getGridItemsAroundCoordinates(coordinates, VIEW_RANGE);
-    }
+    public List<GridItem> getGridItemsInActorLineOfSight(Actor actor) {
+        int[] actorCoords = coordsLookupMap.get(actor);
 
-    public List<GridItem> getGridItemsInLineOfSight(Actor actor, Direction direction) {
-        int[][] coordsInLineOfSight = new int[9][2];
-        int[] coords = coordsLookupMap.get(actor);
+        int x = actorCoords[1];
+        int y = actorCoords[0];
 
-        // Something about looping over an offset and multiply the range values by the offset
-        // To compute the line of sight in a given direction. The signs are already in the Direction.
+        Direction d = actor.getDirectionIamFacing();
 
-        return null;
+        int[][][] fieldOfVisionCoords = d.getFieldOfVisionCoordinateDeltas();
+
+        List<GridItem> gridItemsInLineOfSight = new ArrayList<>();
+
+        for(int sightLineIndex = 0; sightLineIndex < fieldOfVisionCoords.length; sightLineIndex ++) {
+
+            boolean worldItemInLineOfSight = false;
+
+            for(int[] cellInSight : fieldOfVisionCoords[sightLineIndex]) {
+                int cellXCoord = x + cellInSight[1];
+
+                if (cellXCoord < 0) {
+                    cellXCoord = 0;
+                } else if (cellXCoord >= width) {
+                    cellXCoord = width - 1;
+                }
+
+                int cellYCoord = y + cellInSight[0];
+
+                if (cellYCoord < 0) {
+                    cellYCoord = 0;
+                } else if (cellYCoord >= height) {
+                    cellYCoord = height - 1;
+                }
+
+                GridItem gridItem = this.getItemAt(cellYCoord, cellXCoord);
+
+                if (gridItem.getWorldItem().getWorldItemId() != WorldItemIds.EMPTY) {
+                    worldItemInLineOfSight = true;
+                    gridItemsInLineOfSight.add(gridItem);
+                    break;
+                }
+            }
+
+            if (!worldItemInLineOfSight) {
+                gridItemsInLineOfSight.add(new GridItem(new EmptyWorldItem()));
+            }
+        }
+
+        return gridItemsInLineOfSight;
     }
 
     public List<GridItem> getGridItemsActorCanInteractWith(Actor actor) {
@@ -102,7 +139,11 @@ public class WorldEngine {
 
     public void addActorNextToActor(Actor existingItem, Actor newItem) {
         int[] currentCoords = coordsLookupMap.get(existingItem);
-        int[] newCoords = new int[]{Math.floorMod(currentCoords[0] + 1, height), Math.floorMod(currentCoords[1] + 1, width)};
+
+        int randomY = (int)(Math.random() * height - 1);
+        int randomX = (int)(Math.random() * width - 1);
+
+        int[] newCoords = new int[]{randomY, randomX};
         coordsLookupMap.put(newItem, newCoords);
         actorsInWorld.add(newItem);
         this.putItemAt(newCoords[0], newCoords[1], newItem);
@@ -139,15 +180,25 @@ public class WorldEngine {
             List<Breeder> breeders = actorsInWorld.stream().filter(Actor::isAlive).map(actor -> ((Breeder)actor)).toList();
             List<Breeder> orderedByPerformance = breeders.stream()
                     .sorted(Comparator.comparingInt(Breeder::getFitnessScore).reversed()).toList();
-            System.out.println(orderedByPerformance.size() + " living things fit to breed. The top 3 will reproduce.");
+            System.out.println(orderedByPerformance.size() + " to breed. The top 3 will reproduce.");
 
-            System.out.println(orderedByPerformance.stream().map(Breeder::getFitnessScore).toList().toString());
+            System.out.println(orderedByPerformance.stream().map(Breeder::getFitnessScore).toList());
 
             int newChildCount = Math.min(orderedByPerformance.size(), 3);
 
             for(int x = 0; x < newChildCount; x++) {
                 LivingThing parent = (LivingThing) orderedByPerformance.get(x);
-                LivingThing child = new LivingThing(this, parent.getNeuralNetwork(), 0.05);
+
+                boolean inheritsBrain = Math.random() > 0.5;
+
+                LivingThing child;
+
+                if (inheritsBrain) {
+                    child = new LivingThing(this, parent.getNeuralNetwork(), 0.95, parent.getTicks());
+                } else {
+                    child = new LivingThing(this, 0.95, parent.getTicks());
+                }
+
                 this.addActorNextToActor(parent, child);
                 asyncWakeUp(child);
             }
@@ -190,5 +241,18 @@ public class WorldEngine {
 
     public int getHeight() {
         return height;
+    }
+
+    public List<Actor> getActorsInWorld() {
+        return actorsInWorld;
+    }
+
+    public int[] getActorCoords(Actor actor) {
+        return coordsLookupMap.get(actor);
+    }
+
+    public void cleanUpCorpse(Actor actor) {
+        coordsLookupMap.remove(actor);
+        actorsInWorld.remove(actor);
     }
 }

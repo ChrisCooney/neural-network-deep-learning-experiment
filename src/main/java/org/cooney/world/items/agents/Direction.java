@@ -2,24 +2,49 @@ package org.cooney.world.items.agents;
 
 public enum Direction {
 
-    UP(0, 0, -1),
-    DOWN(1, 0, 1),
-    LEFT(2, -1, 0),
-    RIGHT(3, 1, 0),
-    UP_LEFT(4, -1, -1),
-    UP_RIGHT(5, -1, 1),
-    DOWN_LEFT(6, 1, -1),
-    DOWN_RIGHT(7, 1, 1),
-    STAY_STILL(8, 0, 0);
+    UP(0, -1, 0, new int[][][]{
+            {{-2, -1}, {-2, -2}, {-2, -3}, {-2, -4}, {-2, -5}, {-2, -6}},
+            {{-1, -1}, {-1, -2}, {-1, -3}, {-1, -4}, {-1, -5}, {-1, -6}},
+            {{0, -1}, {0, -2}, {0,-3}, {0,-4}, {0,-5}, {0,-6}},
+            {{1, -1}, {1, -2}, {1, -3}, {1, -4}, {1, -5}, {1, -6}},
+            {{2, -1}, {2, -2}, {2, -3}, {2, -4}, {2, -5}, {2, -6}}
+    }),
+    DOWN(1, 1, 0, new int[][][]{
+            {{-2, 1}, {-2, 2}, {-2, 3}, {-2, 4}, {-2, 5}, {-2, 6}},
+            {{-1, 1}, {-1, 2}, {-1, 3}, {-1, 4}, {-1, 5}, {-1, 6}},
+            {{0,  1}, {0,  2}, {0, 3}, {0, 4}, {0, 5}, {0, 6}},
+            {{1,  1}, {1,  2}, {1, 3}, {1, 4}, {1, 5}, {1, 6}},
+            {{2, 1}, {2, 2}, {2, 3}, {2, 4}, {2, 5}, {2, 6}},
+    }),
+    LEFT(2, 0, -1, new int [][][]{
+            {{-1, -2}, {-2, -2}, {-3, -2}, {-4, -2}, {-5, -2}, {-6, -2}},
+            {{-1, -1}, {-2, -1}, {-3, -1}, {-4, -1}, {-5, -1}, {-6, -1}},
+            {{-1,  0}, {-2,  0}, {-3, 0},  {-4, 0},  {-5, 0},  {-6, 0}},
+            {{-1,  1}, {-2,  1}, {-3, 1},  {-4, 1},  {-5, 1},  {-6, 1}},
+            {{-1,  2}, {-2,  2}, {-3, 2},  {-4, 2},  {-5, 2},  {-6, 2}}
+    }),
+    RIGHT(3, 0, 1, new int [][][]{
+            {{1, -2}, {2, -2}, {3, -2}, {4, -2}, {5, -2}, {6, -2}},
+            {{1, -1}, {2, -1}, {3, -1}, {4, -1}, {5, -1}, {6, -1}},
+            {{1,  0}, {2,  0}, {3,  0}, {4,  0}, {5,  0}, {6,  0}},
+            {{1,  1}, {2,  1}, {3,  1}, {4,  1}, {5,  1}, {6,  1}},
+            {{1,  2}, {2,  2}, {3,  2}, {4,  2}, {5,  2}, {6,  2}}
+    }),
+    STAY_STILL(4, 0, 0, new int [][][]{
+            // Stay Still has no related field of vision. Instead, use the previously selected direction.
+    });
 
     private final int index;
     private final int xDirection;
     private final int yDirection;
 
-    Direction(int index, int xDirection, int yDirection) {
+    private final int[][][] fieldOfVisionCoordinateDeltas;
+
+    Direction(int index, int xDirection, int yDirection, int[][][] fieldOfVisionCoordinateDeltas) {
         this.index = index;
         this.xDirection = xDirection;
         this.yDirection = yDirection;
+        this.fieldOfVisionCoordinateDeltas = fieldOfVisionCoordinateDeltas;
     }
 
     public static Direction randomDirection() {
@@ -36,6 +61,10 @@ public enum Direction {
 
     public int getYDirection() {
         return yDirection;
+    }
+
+    public int[][][] getFieldOfVisionCoordinateDeltas() {
+        return fieldOfVisionCoordinateDeltas;
     }
 
     public static Direction getFromIndex(int index) {
