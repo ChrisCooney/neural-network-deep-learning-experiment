@@ -175,23 +175,21 @@ public class WorldEngine {
                 continue;
             }
 
-            List<Breeder> breeders = actorsInWorld.stream().filter(Actor::isAlive).map(actor -> ((Breeder)actor)).toList();
+            List<Breeder> breeders = actorsInWorld.stream()
+                    .filter(Actor::isAlive)
+                    .map(actor -> ((Breeder)actor))
+                    .filter(Breeder::isFitToBreed).toList();
+
             List<Breeder> orderedByPerformance = breeders.stream()
                     .sorted(Comparator.comparingInt(Breeder::getFitnessScore).reversed()).toList();
             System.out.println(orderedByPerformance.size() + " to breed. The top 3 will reproduce.");
-
-            System.out.println(orderedByPerformance.stream().map(Breeder::getFitnessScore).toList());
 
             int newChildCount = Math.min(orderedByPerformance.size(), 3);
 
             for(int x = 0; x < newChildCount; x++) {
                 LivingThing parent = (LivingThing) orderedByPerformance.get(x);
 
-                boolean inheritsBrain = true;
-
-                LivingThing child;
-
-                child = new LivingThing(this, parent.getNeuralNetwork(), 0.05, parent.getTicks());
+                LivingThing child = new LivingThing(this, parent.getNeuralNetwork(), 0.05, parent.getTicks());
 
                 this.addActorInRandomPlace(child);
                 asyncWakeUp(child);

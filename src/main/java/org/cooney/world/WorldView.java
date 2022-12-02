@@ -2,13 +2,6 @@ package org.cooney.world;
 
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.TextColor;
-import com.googlecode.lanterna.gui2.BasicWindow;
-import com.googlecode.lanterna.gui2.Button;
-import com.googlecode.lanterna.gui2.DefaultWindowManager;
-import com.googlecode.lanterna.gui2.EmptySpace;
-import com.googlecode.lanterna.gui2.MultiWindowTextGUI;
-import com.googlecode.lanterna.screen.Screen;
-import com.googlecode.lanterna.screen.TerminalScreen;
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory;
 import com.googlecode.lanterna.terminal.Terminal;
 import com.googlecode.lanterna.terminal.swing.SwingTerminalFontConfiguration;
@@ -16,16 +9,11 @@ import org.cooney.world.items.Actor;
 import org.cooney.world.items.WorldItem;
 import org.cooney.world.items.WorldItemIds;
 import org.cooney.world.items.agents.Direction;
-import org.cooney.world.map.FoodOnlySeeder;
 import org.cooney.world.map.RandomWorldSeeder;
-import org.cooney.world.map.RiverWorldSeeder;
-import org.cooney.world.map.SoloActorSeeder;
 
-import java.awt.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 public class WorldView {
     private static final int WORLD_HEIGHT =300;
@@ -104,7 +92,7 @@ public class WorldView {
         try {
             worldEngine.begin();
             Terminal terminal = new DefaultTerminalFactory()
-                    .setTerminalEmulatorFontConfiguration(SwingTerminalFontConfiguration.getDefaultOfSize(10))
+                    .setTerminalEmulatorFontConfiguration(SwingTerminalFontConfiguration.getDefaultOfSize(50))
                     .setInitialTerminalSize(new TerminalSize(WORLD_HEIGHT + 100, WORLD_WIDTH))
                     .createTerminal();
 
