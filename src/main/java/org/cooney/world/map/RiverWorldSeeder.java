@@ -3,10 +3,9 @@ package org.cooney.world.map;
 import org.cooney.world.WorldEngine;
 import org.cooney.world.items.EmptyWorldItem;
 import org.cooney.world.items.WorldItem;
-import org.cooney.world.items.agents.LivingThing;
+import org.cooney.world.items.agents.SurvivingThing;
 import org.cooney.world.items.resources.Food;
 import org.cooney.world.items.resources.Water;
-import org.cooney.world.utils.ChanceUtils;
 
 public class RiverWorldSeeder implements Seeder {
 
@@ -34,6 +33,20 @@ public class RiverWorldSeeder implements Seeder {
         }
     }
 
+    public int getReproduceRateInMillis() {
+        return 10000;
+    }
+
+    @Override
+    public int getNewGenerationCount() {
+        return 5;
+    }
+
+    @Override
+    public int getPopulationCap() {
+        return 30;
+    }
+
     private WorldItem randomlySelectWorldItem(WorldEngine worldEngine) {
         double relativeLivingThingChance = 0.01/3;
         double relativeFoodChance = 0.015/3;
@@ -41,7 +54,7 @@ public class RiverWorldSeeder implements Seeder {
         double random = Math.random();
 
         if (random <= relativeLivingThingChance) {
-            return new LivingThing(worldEngine);
+            return new SurvivingThing(worldEngine);
         } else if (random <= (relativeLivingThingChance + relativeFoodChance)) {
             return new Food();
         } else {

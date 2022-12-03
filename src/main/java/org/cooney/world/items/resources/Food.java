@@ -49,6 +49,11 @@ public class Food implements WorldItem, Consumable {
     }
 
     @Override
+    public boolean getIsMovingWorldItem() {
+        return false;
+    }
+
+    @Override
     public String getColourCode() {
         return resourceCount > 0 ? "GREEN" : "YELLOW";
     }

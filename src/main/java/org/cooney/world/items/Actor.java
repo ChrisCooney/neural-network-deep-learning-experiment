@@ -10,4 +10,5 @@ public interface Actor extends WorldItem {
     public void act(List<GridItem> nearbyGridItems);
     public boolean isAlive();
     public Direction getDirectionIamFacing();
+    int getTicks();
 }

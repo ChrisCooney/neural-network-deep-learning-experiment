@@ -3,7 +3,7 @@ package org.cooney.world.map;
 import org.cooney.world.WorldEngine;
 import org.cooney.world.items.EmptyWorldItem;
 import org.cooney.world.items.WorldItem;
-import org.cooney.world.items.agents.LivingThing;
+import org.cooney.world.items.agents.SurvivingThing;
 import org.cooney.world.items.resources.Food;
 import org.cooney.world.items.resources.Water;
 
@@ -22,7 +22,22 @@ public class SoloActorSeeder implements Seeder {
         int xRand = (int) (Math.random() * worldEngine.getWidth());
         int yRand = (int) (Math.random() * worldEngine.getHeight());
 
-        worldEngine.putItemAt(yRand, xRand, new LivingThing(worldEngine));
+        worldEngine.putItemAt(yRand, xRand, new SurvivingThing(worldEngine));
+    }
+
+    @Override
+    public int getPopulationCap() {
+        return 1;
+    }
+
+    @Override
+    public int getReproduceRateInMillis() {
+        return 10000;
+    }
+
+    @Override
+    public int getNewGenerationCount() {
+        return 1;
     }
 
     protected WorldItem decideWorldItemByChance(WorldEngine worldEngine) {

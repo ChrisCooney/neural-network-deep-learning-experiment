@@ -9,7 +9,7 @@ import org.cooney.world.items.Actor;
 import org.cooney.world.items.WorldItem;
 import org.cooney.world.items.WorldItemIds;
 import org.cooney.world.items.agents.Direction;
-import org.cooney.world.map.RandomWorldSeeder;
+import org.cooney.world.map.BattleRoyaleSeeder;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -18,7 +18,9 @@ import java.util.List;
 public class WorldView {
     private static final int WORLD_HEIGHT =300;
     private static final int WORLD_WIDTH = 75;
-    private final WorldEngine worldEngine = new WorldEngine(WORLD_HEIGHT, WORLD_WIDTH, new RandomWorldSeeder());
+    private final WorldEngine worldEngine = new WorldEngine(WORLD_HEIGHT, WORLD_WIDTH, new BattleRoyaleSeeder());
+    private boolean keepRunning = true;
+
     public void render(Terminal terminal) throws IOException {
         for(int y = 0; y < WORLD_HEIGHT; y++) {
             for(int x = 0; x < WORLD_WIDTH; x++) {
@@ -84,6 +86,8 @@ public class WorldView {
 
         terminal.setCursorPosition(WORLD_HEIGHT + 20, 10);
         terminal.putString("Total number in Game: " + worldEngine.getActorsInWorld().size());
+        terminal.setCursorPosition(WORLD_HEIGHT + 20, 12);
+        terminal.putString("Ticks: " + worldEngine.getAverageTicks());
         terminal.setCursorPosition(1000, 1000);
 
         terminal.flush();
@@ -96,7 +100,8 @@ public class WorldView {
                     .setInitialTerminalSize(new TerminalSize(WORLD_HEIGHT + 100, WORLD_WIDTH))
                     .createTerminal();
 
-            while(true) {
+
+            while(keepRunning) {
                 terminal.clearScreen();
                 render(terminal);
                 terminal.flush();

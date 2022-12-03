@@ -43,6 +43,11 @@ public class Water implements Consumable, WorldItem {
     }
 
     @Override
+    public boolean getIsMovingWorldItem() {
+        return false;
+    }
+
+    @Override
     public String getColourCode() {
         return resourceCount > 0 ? "BLUE": "GREY";
     }

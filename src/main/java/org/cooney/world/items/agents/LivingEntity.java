@@ -24,7 +24,7 @@ public abstract class LivingEntity implements Actor, Learner, WorldItem {
     protected Direction previousDirection = Direction.DOWN;
     protected boolean alive = true;
     protected final NeuralNetwork neuralNetwork;
-    protected final List<LivingThingMemory> memory = new ArrayList<>();
+    protected final List<LivingEntityMemory> memory = new ArrayList<>();
     protected final WorldEngine outsideWorld;
 
     public LivingEntity(double learningDegradationRate, int meditationCadenceInTicks, int explorationDegradeCadenceInTicks, int maxMemorySize, NeuralNetwork neuralNetwork, WorldEngine outsideWorld, int ticks, double initialExplorationRate) {
@@ -43,11 +43,13 @@ public abstract class LivingEntity implements Actor, Learner, WorldItem {
             List<GridItem> gridItemsICanSee = outsideWorld.getGridItemsInActorLineOfSight(this);
             act(gridItemsICanSee);
             try {
-                Thread.sleep(100);
+                Thread.sleep(10);
             } catch (InterruptedException e) {
                 // it's okay if the thread is interrupted. Catch and swallow.
             }
         }
+
+        System.out.println("I HAVE DIED!");
 
         outsideWorld.cleanUpCorpse(this);
     }
@@ -67,7 +69,7 @@ public abstract class LivingEntity implements Actor, Learner, WorldItem {
     }
 
     protected void rememberThisDecision(double[] input, double[] inputStats, double moveScore, double[] newSurroundingItems, double[] newStats, Direction direction) {
-        this.memory.add(new LivingThingMemory(input, inputStats, moveScore, newSurroundingItems, newStats, direction));
+        this.memory.add(new LivingEntityMemory(input, inputStats, moveScore, newSurroundingItems, newStats, direction));
 
         if (this.memory.size() > maxMemorySize) {
             // Get rid of the oldest memory from the working set.
@@ -142,9 +144,9 @@ public abstract class LivingEntity implements Actor, Learner, WorldItem {
                     learn();
                 } else {
                     makeAMove(input);
-                    if (this.isDead()) {
-                        System.out.println("I AM DEAD!");
+                    if (this.shouldBeDead()) {
                         alive = false;
+                        return;
                     }
                 }
 
@@ -157,11 +159,21 @@ public abstract class LivingEntity implements Actor, Learner, WorldItem {
         }
     }
 
+    protected void updateDirection(Direction newDirection) {
+        this.previousDirection = this.currentDirection == Direction.STAY_STILL ? this.previousDirection : this.currentDirection;
+        this.currentDirection = newDirection;
+    }
+
     @Override
     public double getWorldItemId() {
         return alive? WorldItemIds.LIVING_THING_ID : WorldItemIds.CORPSE;
     }
 
+    @Override
+    public boolean getIsMovingWorldItem() {
+        return true;
+    }
+
     protected abstract void makeAMove(double[] input) throws InvalidMatrixShapeException;
-    protected abstract boolean isDead();
+    protected abstract boolean shouldBeDead();
 }

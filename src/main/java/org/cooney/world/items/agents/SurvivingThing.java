@@ -5,6 +5,7 @@ import org.cooney.neural.InvalidTrainingDataException;
 import org.cooney.neural.NeuralNetwork;
 import org.cooney.neural.NeuralNetworkTrainingData;
 import org.cooney.world.WorldEngine;
+import org.cooney.world.items.Breeder;
 import org.cooney.world.items.WorldItem;
 import org.cooney.world.items.WorldItemIds;
 import org.cooney.world.items.resources.Food;
@@ -17,21 +18,19 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 
-public class LivingThing extends LivingEntity {
-    private static final int MEDITATION_CADENCE_IN_TICKS = 100;
-    private static final int EXPLORATION_DEGRADE_CADENCE_IN_TICKS = 100;
+public class SurvivingThing extends LivingEntity implements Breeder {
     private double hunger;
     private double thirst;
     private double isolation;
     private int totalScore;
     private double energy;
 
-    public LivingThing(WorldEngine outsideWorld) {
+    public SurvivingThing(WorldEngine outsideWorld) {
         super(0.05,
                 100,
                 100,
                 1000,
-                new NeuralNetwork(7, 500, 5, 0.1),
+                new NeuralNetwork(7, 150, 5, 0.1),
                 outsideWorld,
                 0,
                 0.95
@@ -44,7 +43,7 @@ public class LivingThing extends LivingEntity {
         this.energy = 500;
     }
 
-    public LivingThing(WorldEngine outsideWorld, NeuralNetwork neuralNetwork, double explorationRate, int ticks) {
+    public SurvivingThing(WorldEngine outsideWorld, NeuralNetwork neuralNetwork, double explorationRate, int ticks) {
         super(0.05,
                 100,
                 100,
@@ -61,48 +60,21 @@ public class LivingThing extends LivingEntity {
         this.energy = 500;
     }
 
-    @Override
-    public void act(List<GridItem> gridItems) {
-        double[] input = gridItemsToNetworkInput(gridItems);
-
-        ticks ++;
-
-        try {
-            if (alive) {
-                if (ticks % MEDITATION_CADENCE_IN_TICKS == 0) {
-                    learn();
-                } else {
-                    makeAMove(input);
-                    if (hunger > 1000 || thirst > 1000) {
-                        System.out.println("I AM DEAD!");
-                        alive = false;
-                    }
-                }
-
-                if (ticks % EXPLORATION_DEGRADE_CADENCE_IN_TICKS == 0) {
-                    degradeExplorationRate();
-                }
-            }
-        } catch (InvalidMatrixShapeException | InvalidTrainingDataException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    protected void makeAMove(double[] input) throws InvalidMatrixShapeException {
+    protected void makeAMove(double[] surroundingItems) throws InvalidMatrixShapeException {
         double[] stats = createStatsArray();
-        double[] networkInput = buildNeuralNetworkInputArray(input, stats);
+        double[] networkInput = buildNeuralNetworkInputArray(surroundingItems, stats);
         Direction direction = energy == 0? Direction.STAY_STILL : decide(networkInput);
         move(direction);
 
         // If it went from moving to staying still, keep the previous direction set to what it was already.
         // If they've gone from moving in one direction to another, track the previous direction.
-        this.previousDirection = this.currentDirection == Direction.STAY_STILL ? this.previousDirection : this.currentDirection;
-        this.currentDirection = direction;
+        updateDirection(direction);
+
         List<GridItem> surroundingGridItems = lookAround();
-        List<GridItem> consumableGridItems = outsideWorld.getGridItemsActorCanInteractWith(this);
+        List<GridItem> consumableGridItems = outsideWorld.getInteractableGridItems(this);
         double[] newStats = consumeResources(consumableGridItems);
         double moveScore = scoreTheMoveIMade(newStats);
-        rememberThisDecision(input, createStatsArray(), moveScore, gridItemsToNetworkInput(surroundingGridItems), newStats, direction);
+        rememberThisDecision(surroundingItems, createStatsArray(), moveScore, gridItemsToNetworkInput(surroundingGridItems), newStats, direction);
         updateMyStats(newStats);
 
         if (direction != Direction.STAY_STILL) {
@@ -113,7 +85,7 @@ public class LivingThing extends LivingEntity {
     }
 
     @Override
-    protected boolean isDead() {
+    protected boolean shouldBeDead() {
         return thirst > 1000 || hunger > 1000;
     }
 
@@ -255,7 +227,7 @@ public class LivingThing extends LivingEntity {
         for (int x = 0; x < memory.size(); x++) {
             inputs[x] = buildNeuralNetworkInputArray(memory.get(x).oldSurroundingItems(), memory.get(x).stats());
             scores[x] = memory.get(x).score();
-            newSurroundingItems[x] = buildNeuralNetworkInputArray(memory.get(x).newSurroundingItems(), memory.get(x).stats());
+            newSurroundingItems[x] = buildNeuralNetworkInputArray(memory.get(x).newSurroundingItems(), memory.get(x).newStats());
             actionsTaken[x] = memory.get(x).action().getIndex();
         }
 
@@ -304,6 +276,11 @@ public class LivingThing extends LivingEntity {
 
     public int getFitnessScore() {
         return totalScore;
+    }
+
+    @Override
+    public Breeder copy() {
+        return new SurvivingThing(outsideWorld, this.getNeuralNetwork(), 0.05, this.getTicks());
     }
 }
 

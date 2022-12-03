@@ -3,7 +3,7 @@ package org.cooney.world.map;
 import org.cooney.world.WorldEngine;
 import org.cooney.world.items.EmptyWorldItem;
 import org.cooney.world.items.WorldItem;
-import org.cooney.world.items.agents.LivingThing;
+import org.cooney.world.items.agents.SurvivingThing;
 import org.cooney.world.items.resources.Food;
 import org.cooney.world.items.resources.Water;
 import org.cooney.world.utils.ChanceUtils;
@@ -26,11 +26,25 @@ public class FarmWorldSeeder implements Seeder{
                     worldItem = new Water();
                 }
                 else {
-                    worldItem = ChanceUtils.rollTheDice(0.5) ? new LivingThing(worldEngine) : new EmptyWorldItem();
+                    worldItem = ChanceUtils.rollTheDice(0.5) ? new SurvivingThing(worldEngine) : new EmptyWorldItem();
                 }
 
                 worldEngine.putItemAt(y, x, worldItem);
             }
         }
+    }
+
+    public int getReproduceRateInMillis() {
+        return 10000;
+    }
+
+    @Override
+    public int getNewGenerationCount() {
+        return 5;
+    }
+
+    @Override
+    public int getPopulationCap() {
+        return 30;
     }
 }

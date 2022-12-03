@@ -8,7 +8,12 @@ public class EmptyWorldItem implements WorldItem{
 
     @Override
     public double getWorldItemId() {
-        return 0;
+        return WorldItemIds.EMPTY;
+    }
+
+    @Override
+    public boolean getIsMovingWorldItem() {
+        return false;
     }
 
     @Override

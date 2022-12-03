@@ -3,7 +3,7 @@ package org.cooney.world.map;
 import org.cooney.world.WorldEngine;
 import org.cooney.world.items.EmptyWorldItem;
 import org.cooney.world.items.WorldItem;
-import org.cooney.world.items.agents.LivingThing;
+import org.cooney.world.items.agents.SurvivingThing;
 import org.cooney.world.items.resources.Food;
 import org.cooney.world.items.resources.Water;
 
@@ -32,7 +32,7 @@ public class RandomWorldSeeder implements Seeder {
         double random = Math.random();
 
         if (random <= relativeLivingThingChance) {
-            return new LivingThing(worldEngine);
+            return new SurvivingThing(worldEngine);
         } else if (random <= (relativeLivingThingChance + relativeFoodChance)) {
             return new Food();
         } else if (random <= (relativeLivingThingChance + relativeFoodChance + relativeWaterChance)) {
@@ -40,5 +40,19 @@ public class RandomWorldSeeder implements Seeder {
         } else {
             return new EmptyWorldItem();
         }
+    }
+
+    public int getReproduceRateInMillis() {
+        return 10000;
+    }
+
+    @Override
+    public int getNewGenerationCount() {
+        return 5;
+    }
+
+    @Override
+    public int getPopulationCap() {
+        return 30;
     }
 }

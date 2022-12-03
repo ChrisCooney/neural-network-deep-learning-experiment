@@ -2,7 +2,6 @@ package org.cooney.world;
 
 import org.cooney.world.items.*;
 import org.cooney.world.items.agents.Direction;
-import org.cooney.world.items.agents.LivingThing;
 import org.cooney.world.map.GridItem;
 import org.cooney.world.map.Seeder;
 
@@ -11,7 +10,6 @@ import java.util.stream.IntStream;
 
 public class WorldEngine {
 
-    private static final int VIEW_RANGE = 3;
     private final GridItem[][] world;
 
     private final List<Actor> actorsInWorld;
@@ -20,15 +18,17 @@ public class WorldEngine {
 
     private final List<Thread> actorThreads;
 
-
-
     private final int width;
     private final int height;
+
+    private Seeder seeder;
 
     public WorldEngine(int height, int width, Seeder seeder) {
         this.world = new GridItem[height][width];
         this.width = width;
         this.height = height;
+        this.seeder = seeder;
+
         coordsLookupMap = new HashMap<>();
         actorsInWorld = new ArrayList<>();
         actorThreads = new ArrayList<>();
@@ -42,7 +42,7 @@ public class WorldEngine {
             for(int x = 0; x < width; x++) {
                 WorldItem worldItem = world[y][x].getWorldItem();
 
-                if (worldItem.getWorldItemId() == WorldItemIds.LIVING_THING_ID) {
+                if (worldItem.getIsMovingWorldItem()) {
                     this.coordsLookupMap.put(worldItem, new int[]{y, x});
                     this.actorsInWorld.add((Actor)worldItem);
                 }
@@ -62,11 +62,10 @@ public class WorldEngine {
 
         List<GridItem> gridItemsInLineOfSight = new ArrayList<>();
 
-        for(int sightLineIndex = 0; sightLineIndex < fieldOfVisionCoords.length; sightLineIndex ++) {
-
+        for (int[][] fieldOfVisionCoord : fieldOfVisionCoords) {
             boolean worldItemInLineOfSight = false;
 
-            for(int[] cellInSight : fieldOfVisionCoords[sightLineIndex]) {
+            for (int[] cellInSight : fieldOfVisionCoord) {
                 int cellXCoord = x + cellInSight[1];
 
                 if (cellXCoord < 0) {
@@ -100,7 +99,7 @@ public class WorldEngine {
         return gridItemsInLineOfSight;
     }
 
-    public List<GridItem> getGridItemsActorCanInteractWith(Actor actor) {
+    public List<GridItem> getInteractableGridItems(Actor actor) {
         int[] coordinates = coordsLookupMap.get(actor);
         return getGridItemsAroundCoordinates(coordinates, 1);
     }
@@ -167,10 +166,10 @@ public class WorldEngine {
 
     private void reproduceInPopulation() throws InterruptedException {
         while(true) {
-            Thread.sleep(7000);
+            Thread.sleep(seeder.getReproduceRateInMillis());
             System.out.println("Reproduce Cycle Occurring");
 
-            if (actorsInWorld.size() > 25) {
+            if (actorsInWorld.size() > seeder.getPopulationCap()) {
                 System.out.println("Already at population cap.");
                 continue;
             }
@@ -182,17 +181,15 @@ public class WorldEngine {
 
             List<Breeder> orderedByPerformance = breeders.stream()
                     .sorted(Comparator.comparingInt(Breeder::getFitnessScore).reversed()).toList();
-            System.out.println(orderedByPerformance.size() + " to breed. The top 3 will reproduce.");
+            System.out.println(orderedByPerformance.size() + " to breed. The top " + seeder.getNewGenerationCount() + " will reproduce.");
 
-            int newChildCount = Math.min(orderedByPerformance.size(), 3);
+            int newChildCount = Math.min(orderedByPerformance.size(), seeder.getNewGenerationCount());
 
             for(int x = 0; x < newChildCount; x++) {
-                LivingThing parent = (LivingThing) orderedByPerformance.get(x);
-
-                LivingThing child = new LivingThing(this, parent.getNeuralNetwork(), 0.05, parent.getTicks());
-
-                this.addActorInRandomPlace(child);
-                asyncWakeUp(child);
+                Breeder child = orderedByPerformance.get(x).copy();
+                Actor childAsActor = (Actor) child;
+                this.addActorInRandomPlace(childAsActor);
+                asyncWakeUp(childAsActor);
             }
         }
     }
@@ -206,7 +203,7 @@ public class WorldEngine {
         int newY = Math.floorMod(oldY + yDelta, height);
         int newX = Math.floorMod(oldX + xDelta, width);
 
-        if (world[newY][newX].getWorldItem().getWorldItemId() != WorldItemIds.LIVING_THING_ID) {
+        if (!world[newY][newX].getWorldItem().getIsMovingWorldItem()) {
             // Prevent the living things from trampling food and water out of existence.
             putItemAt(oldY, oldX, world[newY][newX].getWorldItem());
         } else {
@@ -246,5 +243,10 @@ public class WorldEngine {
     public void cleanUpCorpse(Actor actor) {
         coordsLookupMap.remove(actor);
         actorsInWorld.remove(actor);
+    }
+
+    public int getAverageTicks() {
+        List<Actor> actorsInWorldCopy = new ArrayList<>(actorsInWorld);
+        return (int) actorsInWorldCopy.stream().mapToInt(Actor::getTicks).average().orElse(0);
     }
 }
